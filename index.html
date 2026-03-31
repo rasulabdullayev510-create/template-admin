@@ -1,0 +1,631 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Admin — Business Dashboard</title>
+<link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --bg:#0a0f1e;--bg2:#111827;--bg3:#1a2235;--bg4:#1f2d45;
+  --border:rgba(255,255,255,0.07);--border2:rgba(255,255,255,0.12);
+  --text:#ffffff;--text2:rgba(255,255,255,0.6);--text3:rgba(255,255,255,0.3);
+  --primary:#3b82f6;--primary-dark:#2563eb;--primary-glow:rgba(59,130,246,0.15);
+  --green:#10b981;--green-bg:rgba(16,185,129,0.1);
+  --yellow:#f59e0b;--yellow-bg:rgba(245,158,11,0.1);
+  --red:#ef4444;--red-bg:rgba(239,68,68,0.1);
+  --radius:14px;
+}
+html{scroll-behavior:smooth}
+body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;min-height:100vh;-webkit-font-smoothing:antialiased}
+
+/* Login */
+.login{min-height:100vh;display:flex;align-items:center;justify-content:center;padding:24px;background:radial-gradient(ellipse 80% 60% at 50% 0%,rgba(59,130,246,0.08) 0%,transparent 70%)}
+.login-box{background:var(--bg2);border:1px solid var(--border2);border-radius:20px;padding:48px 40px;width:100%;max-width:380px}
+.login-logo{font-size:13px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);margin-bottom:32px}
+.login-title{font-size:2rem;font-weight:800;margin-bottom:6px;letter-spacing:-0.02em}
+.login-sub{font-size:14px;color:var(--text2);margin-bottom:32px}
+.field{display:flex;flex-direction:column;gap:7px;margin-bottom:16px}
+.field label{font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3)}
+.field input,.field select{background:var(--bg3);border:1px solid var(--border2);border-radius:10px;padding:12px 15px;font-family:'Outfit',sans-serif;font-size:14px;color:var(--text);outline:none;transition:border-color 0.15s;-webkit-appearance:none}
+.field input:focus,.field select:focus{border-color:var(--primary)}
+.field input::placeholder{color:var(--text3)}
+.login-url{font-size:12px;color:var(--text3);margin-bottom:20px;word-break:break-all}
+.btn{width:100%;background:var(--primary);color:#fff;border:none;border-radius:10px;padding:14px;font-family:'Outfit',sans-serif;font-size:15px;font-weight:700;cursor:pointer;transition:all 0.15s}
+.btn:hover{background:var(--primary-dark);transform:translateY(-1px)}
+.btn:disabled{opacity:0.4;cursor:default;transform:none}
+.err{font-size:13px;color:var(--red);margin-top:12px;display:none;text-align:center}
+
+/* App shell */
+.app{display:none;min-height:100vh}
+.sidebar{position:fixed;top:0;left:0;bottom:0;width:240px;background:var(--bg2);border-right:1px solid var(--border);display:flex;flex-direction:column;padding:28px 16px;z-index:10}
+.sb-brand{display:flex;align-items:center;gap:10px;padding:0 8px;margin-bottom:36px}
+.sb-brand-dot{width:8px;height:8px;border-radius:50%;background:var(--green)}
+.sb-brand-name{font-size:14px;font-weight:700;color:var(--text)}
+.sb-brand-sub{font-size:11px;color:var(--text3)}
+.sb-section{font-size:10px;font-weight:700;letter-spacing:0.12em;text-transform:uppercase;color:var(--text3);padding:0 10px;margin:20px 0 8px}
+.nav-item{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:10px;font-size:13px;font-weight:500;color:var(--text2);cursor:pointer;transition:all 0.15s;margin-bottom:2px;border:none;background:none;width:100%;text-align:left;font-family:'Outfit',sans-serif}
+.nav-item:hover{background:var(--bg3);color:var(--text)}
+.nav-item.active{background:var(--primary-glow);color:var(--primary);font-weight:600}
+.nav-item-icon{width:18px;text-align:center;font-size:14px}
+.sb-bottom{margin-top:auto}
+.main{margin-left:240px;padding:40px;min-height:100vh}
+
+/* Page header */
+.page-hdr{margin-bottom:32px}
+.page-hdr h1{font-size:1.8rem;font-weight:800;letter-spacing:-0.02em;margin-bottom:4px}
+.page-hdr p{font-size:14px;color:var(--text2)}
+
+/* Stat cards */
+.stats-row{display:grid;grid-template-columns:repeat(4,1fr);gap:16px;margin-bottom:24px}
+.stat-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:24px;position:relative;overflow:hidden}
+.stat-card::before{content:'';position:absolute;top:0;left:0;right:0;height:2px}
+.stat-card.green::before{background:var(--green)}
+.stat-card.blue::before{background:var(--primary)}
+.stat-card.yellow::before{background:var(--yellow)}
+.stat-card.red::before{background:var(--red)}
+.stat-lbl{font-size:11px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);margin-bottom:12px}
+.stat-num{font-size:2.4rem;font-weight:800;letter-spacing:-0.03em;line-height:1;margin-bottom:6px}
+.stat-num.green{color:var(--green)}
+.stat-num.blue{color:var(--primary)}
+.stat-num.yellow{color:var(--yellow)}
+.stat-sub{font-size:12px;color:var(--text3)}
+
+/* Charts */
+.charts-row{display:grid;grid-template-columns:2fr 1fr;gap:16px;margin-bottom:24px}
+.chart-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:24px}
+.card-title{font-size:14px;font-weight:700;color:var(--text);margin-bottom:4px}
+.card-sub{font-size:12px;color:var(--text3);margin-bottom:20px}
+
+/* Schedule */
+.schedule-list{display:flex;flex-direction:column;gap:8px;margin-top:4px;max-height:320px;overflow-y:auto}
+.sched-item{display:flex;align-items:center;gap:12px;padding:12px 14px;background:var(--bg3);border-radius:10px;border:1px solid var(--border)}
+.sched-date{font-size:11px;font-weight:700;color:var(--primary);min-width:60px}
+.sched-time{font-size:11px;color:var(--text3);min-width:54px}
+.sched-name{font-size:13px;font-weight:600;flex:1}
+.sched-svc{font-size:11px;color:var(--text2)}
+.sched-price{font-size:13px;font-weight:700;color:var(--green)}
+.no-sched{font-size:13px;color:var(--text3);text-align:center;padding:32px 0}
+
+/* Table */
+.table-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:20px}
+.table-head{padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
+.table-head-title{font-size:14px;font-weight:700}
+table{width:100%;border-collapse:collapse}
+th{text-align:left;font-size:10px;font-weight:700;letter-spacing:0.1em;text-transform:uppercase;color:var(--text3);padding:12px 16px;border-bottom:1px solid var(--border)}
+td{padding:12px 16px;font-size:13px;border-bottom:1px solid rgba(255,255,255,0.04)}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:rgba(255,255,255,0.02)}
+.badge{display:inline-block;padding:3px 10px;border-radius:6px;font-size:10px;font-weight:700;letter-spacing:0.05em;text-transform:uppercase}
+.badge-confirmed{background:rgba(59,130,246,0.15);color:var(--primary)}
+.badge-pending{background:var(--yellow-bg);color:var(--yellow)}
+.badge-denied,.badge-cancelled{background:var(--red-bg);color:var(--red)}
+.badge-sent{background:var(--green-bg);color:var(--green)}
+
+/* Walkins form */
+.form-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:28px;margin-bottom:20px}
+.form-card h3{font-size:15px;font-weight:700;margin-bottom:4px}
+.form-card p{font-size:13px;color:var(--text2);margin-bottom:24px}
+.form-row{display:grid;grid-template-columns:1fr 1fr 1fr auto;gap:12px;align-items:end}
+.form-row .field{margin-bottom:0}
+.btn-sm{background:var(--primary);color:#fff;border:none;border-radius:10px;padding:12px 20px;font-family:'Outfit',sans-serif;font-size:13px;font-weight:700;cursor:pointer;white-space:nowrap;transition:all 0.15s;height:44px}
+.btn-sm:hover{background:var(--primary-dark)}
+.form-msg{font-size:13px;margin-top:12px;display:none}
+.form-msg.ok{color:var(--green)}
+.form-msg.fail{color:var(--red)}
+
+/* Conversion meter */
+.conv-meter{margin-top:12px}
+.conv-bar-bg{height:8px;background:var(--bg3);border-radius:4px;overflow:hidden;margin:8px 0 4px}
+.conv-bar-fill{height:100%;border-radius:4px;background:linear-gradient(90deg,var(--primary),var(--green));transition:width 1s ease}
+.conv-labels{display:flex;justify-content:space-between;font-size:11px;color:var(--text3)}
+
+/* Traffic cards */
+.traffic-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:20px}
+.traffic-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:20px;text-align:center}
+.traffic-num{font-size:1.8rem;font-weight:800;letter-spacing:-0.02em;margin-bottom:4px}
+.traffic-lbl{font-size:11px;color:var(--text3);font-weight:600;text-transform:uppercase;letter-spacing:0.08em}
+
+/* Scrollbar */
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
+
+/* Mobile */
+@media(max-width:900px){
+  .sidebar{display:none}
+  .main{margin-left:0;padding:20px}
+  .stats-row{grid-template-columns:1fr 1fr}
+  .charts-row{grid-template-columns:1fr}
+  .form-row{grid-template-columns:1fr}
+  .traffic-grid{grid-template-columns:1fr 1fr}
+}
+</style>
+</head>
+<body>
+
+<!-- ── Login ── -->
+<div class="login" id="login">
+  <div class="login-box">
+    <div class="login-logo">Business Admin Portal</div>
+    <div class="login-title">Welcome back</div>
+    <p class="login-sub">Enter your backend URL and password to access your dashboard.</p>
+    <div class="field">
+      <label>Backend URL</label>
+      <input type="url" id="api-url" placeholder="https://your-app.onrender.com"/>
+    </div>
+    <p class="login-url" id="url-preview"></p>
+    <div class="field">
+      <label>Password</label>
+      <input type="password" id="pwd" placeholder="••••••••" onkeydown="if(event.key==='Enter')login()"/>
+    </div>
+    <button class="btn" onclick="login()" id="login-btn">Access Dashboard</button>
+    <div class="err" id="err">Wrong password or couldn't connect.</div>
+  </div>
+</div>
+
+<!-- ── App ── -->
+<div class="app" id="app">
+  <div class="sidebar">
+    <div class="sb-brand">
+      <div>
+        <div class="sb-brand-name" id="sb-name">Dashboard</div>
+        <div style="display:flex;align-items:center;gap:6px;margin-top:3px">
+          <div class="sb-brand-dot"></div>
+          <div class="sb-brand-sub">Live</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="sb-section">Overview</div>
+    <button class="nav-item active" onclick="showPage('overview',this)">
+      <span class="nav-item-icon">◈</span> Overview
+    </button>
+    <button class="nav-item" onclick="showPage('schedule',this)">
+      <span class="nav-item-icon">◷</span> Schedule
+    </button>
+    <button class="nav-item" onclick="showPage('traffic',this)">
+      <span class="nav-item-icon">↗</span> Website Traffic
+    </button>
+
+    <div class="sb-section">Customers</div>
+    <button class="nav-item" onclick="showPage('bookings',this)">
+      <span class="nav-item-icon">☰</span> All Bookings
+    </button>
+    <button class="nav-item" onclick="showPage('walkins',this)">
+      <span class="nav-item-icon">＋</span> Add Walk-in
+    </button>
+    <button class="nav-item" onclick="showPage('reviews',this)">
+      <span class="nav-item-icon">★</span> Reviews
+    </button>
+
+    <div class="sb-bottom">
+      <button class="nav-item" onclick="logout()">
+        <span class="nav-item-icon">⏻</span> Log Out
+      </button>
+    </div>
+  </div>
+
+  <div class="main" id="main"></div>
+</div>
+
+<script>
+const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+const MONTHS_LONG = ['January','February','March','April','May','June','July','August','September','October','November','December'];
+let API = '', pwd = '', stats = null, bookings = [], walkins = [];
+
+// Show URL preview as user types
+document.getElementById('api-url').addEventListener('input', function() {
+  document.getElementById('url-preview').textContent = this.value ? this.value + '/api/stats' : '';
+});
+
+async function login() {
+  API  = (document.getElementById('api-url').value || '').replace(/\/$/, '');
+  pwd  = document.getElementById('pwd').value;
+  if (!API || !pwd) { showErr('Enter your backend URL and password.'); return; }
+
+  const btn = document.getElementById('login-btn');
+  btn.textContent = 'Connecting...'; btn.disabled = true;
+
+  try {
+    const [sr, br, wr] = await Promise.all([
+      fetch(API + '/api/stats?password=' + encodeURIComponent(pwd)),
+      fetch(API + '/api/bookings?password=' + encodeURIComponent(pwd)),
+      fetch(API + '/api/walkins?password=' + encodeURIComponent(pwd)),
+    ]);
+    if (sr.status === 401) { showErr('Wrong password or couldn\'t connect.'); btn.textContent = 'Access Dashboard'; btn.disabled = false; return; }
+    stats    = await sr.json();
+    bookings = await br.json();
+    walkins  = await wr.json();
+
+    // Get business name
+    const ir = await fetch(API + '/api/info');
+    const info = await ir.json();
+    document.getElementById('sb-name').textContent = info.businessName || 'Dashboard';
+    document.title = (info.businessName || 'Business') + ' — Admin';
+
+    document.getElementById('login').style.display = 'none';
+    document.getElementById('app').style.display = 'flex';
+    renderOverview();
+  } catch(e) {
+    showErr('Could not connect. Check the URL.');
+    btn.textContent = 'Access Dashboard'; btn.disabled = false;
+  }
+}
+
+function showErr(msg) {
+  const e = document.getElementById('err');
+  e.textContent = msg; e.style.display = 'block';
+}
+
+function showPage(page, el) {
+  document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
+  if (el) el.classList.add('active');
+  if (page === 'overview')  renderOverview();
+  else if (page === 'schedule') renderSchedule();
+  else if (page === 'traffic')  renderTraffic();
+  else if (page === 'bookings') renderBookings();
+  else if (page === 'walkins')  renderWalkins();
+  else if (page === 'reviews')  renderReviews();
+}
+
+function fmt12(t) {
+  const [h, m] = t.split(':'); const hr = parseInt(h);
+  return (hr > 12 ? hr - 12 : hr || 12) + ':' + m + ' ' + (hr >= 12 ? 'PM' : 'AM');
+}
+function fmtDate(d) {
+  const [y, mo, day] = d.split('-');
+  return MONTHS[parseInt(mo)-1] + ' ' + parseInt(day);
+}
+
+// ── Overview ─────────────────────────────────────────────────
+function renderOverview() {
+  document.getElementById('main').innerHTML = `
+    <div class="page-hdr">
+      <h1>Overview</h1>
+      <p>All-time performance at a glance</p>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card green">
+        <div class="stat-lbl">Total Revenue</div>
+        <div class="stat-num green">$${stats.totalRevenue.toLocaleString()}</div>
+        <div class="stat-sub">From confirmed bookings</div>
+      </div>
+      <div class="stat-card blue">
+        <div class="stat-lbl">Total Bookings</div>
+        <div class="stat-num blue">${stats.totalBookings}</div>
+        <div class="stat-sub">Confirmed appointments</div>
+      </div>
+      <div class="stat-card yellow">
+        <div class="stat-lbl">Avg Rating</div>
+        <div class="stat-num yellow">${stats.avgRating || '—'}</div>
+        <div class="stat-sub">From automated review flow</div>
+      </div>
+      <div class="stat-card blue">
+        <div class="stat-lbl">Review Rate</div>
+        <div class="stat-num">${stats.reviewRate}%</div>
+        <div class="stat-sub">Industry avg ~8%</div>
+      </div>
+    </div>
+    <div class="charts-row">
+      <div class="chart-card">
+        <div class="card-title">Revenue — Last 30 Days</div>
+        <div class="card-sub">Daily revenue from confirmed bookings</div>
+        <canvas id="rev-chart" height="100"></canvas>
+      </div>
+      <div class="chart-card">
+        <div class="card-title">Conversion Rate</div>
+        <div class="card-sub">Website visitors → booked appointments</div>
+        <div style="text-align:center;padding:20px 0">
+          <div style="font-size:3.5rem;font-weight:800;color:var(--primary);letter-spacing:-0.03em">${stats.convRate}%</div>
+          <div style="font-size:13px;color:var(--text3);margin-top:4px">${stats.homeViews} website visits → ${stats.totalBookings} bookings</div>
+        </div>
+        <div class="conv-meter">
+          <div class="conv-bar-bg"><div class="conv-bar-fill" id="conv-fill" style="width:0%"></div></div>
+          <div class="conv-labels"><span>0%</span><span>Industry avg 3%</span><span>10%</span></div>
+        </div>
+        <div style="margin-top:20px;display:flex;flex-direction:column;gap:8px">
+          <div style="display:flex;justify-content:space-between;font-size:13px">
+            <span style="color:var(--text2)">Total site views</span>
+            <span style="font-weight:700">${stats.totalViews.toLocaleString()}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:13px">
+            <span style="color:var(--text2)">Walk-in customers</span>
+            <span style="font-weight:700">${stats.totalWalkins}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="card-title">Upcoming Appointments</div>
+      <div class="card-sub">Next confirmed bookings</div>
+      <div class="schedule-list" id="upcoming-list"></div>
+    </div>`;
+
+  // Revenue chart
+  const revCtx = document.getElementById('rev-chart').getContext('2d');
+  new Chart(revCtx, {
+    type: 'line',
+    data: {
+      labels: Object.keys(stats.viewsByDay).map(d => { const [,m,day] = d.split('-'); return `${parseInt(m)}/${parseInt(day)}`; }),
+      datasets: [{
+        data: Object.keys(stats.viewsByDay).map(d => {
+          const bk = bookings.filter(b => b.date === d && b.status === 'confirmed');
+          return bk.reduce((s, b) => s + b.servicePrice, 0);
+        }),
+        borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.08)',
+        borderWidth: 2, tension: 0.4, fill: true, pointRadius: 0, pointHoverRadius: 4,
+      }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: {
+      x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 11 } } },
+      y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 11 }, callback: v => '$' + v } }
+    }}
+  });
+
+  // Conv fill
+  setTimeout(() => {
+    const pct = Math.min(parseFloat(stats.convRate) * 10, 100);
+    document.getElementById('conv-fill').style.width = pct + '%';
+  }, 100);
+
+  // Upcoming
+  const ul = document.getElementById('upcoming-list');
+  if (!stats.upcoming.length) {
+    ul.innerHTML = '<div class="no-sched">No upcoming bookings</div>';
+  } else {
+    ul.innerHTML = stats.upcoming.slice(0,8).map(b => `
+      <div class="sched-item">
+        <span class="sched-date">${fmtDate(b.date)}</span>
+        <span class="sched-time">${fmt12(b.time)}</span>
+        <div style="flex:1"><div class="sched-name">${b.customerName}</div><div class="sched-svc">${b.serviceName}</div></div>
+        <span class="sched-price">$${b.servicePrice}</span>
+      </div>`).join('');
+  }
+}
+
+// ── Schedule ─────────────────────────────────────────────────
+function renderSchedule() {
+  const today = new Date().toISOString().split('T')[0];
+  const confirmed = bookings.filter(b => b.status === 'confirmed');
+  const upcoming  = confirmed.filter(b => b.date >= today).sort((a,b) => a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
+  const past      = confirmed.filter(b => b.date < today).sort((a,b) => b.date.localeCompare(a.date)||b.time.localeCompare(a.time));
+
+  document.getElementById('main').innerHTML = `
+    <div class="page-hdr">
+      <h1>Schedule</h1>
+      <p>${upcoming.length} upcoming · ${past.length} past</p>
+    </div>
+    <div class="table-wrap">
+      <div class="table-head"><span class="table-head-title">Upcoming Appointments</span></div>
+      <table>
+        <thead><tr><th>Date</th><th>Time</th><th>Customer</th><th>Service</th><th>Price</th><th>Status</th></tr></thead>
+        <tbody>${upcoming.length ? upcoming.map(b => `<tr>
+          <td style="font-weight:600;color:var(--primary)">${fmtDate(b.date)}</td>
+          <td style="color:var(--text2)">${fmt12(b.time)}</td>
+          <td><div style="font-weight:600">${b.customerName}</div><div style="font-size:11px;color:var(--text3)">${b.phone}</div></td>
+          <td style="color:var(--text2)">${b.serviceName}</td>
+          <td style="font-weight:700;color:var(--green)">$${b.servicePrice}</td>
+          <td><span class="badge badge-confirmed">Confirmed</span></td>
+        </tr>`).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:40px">No upcoming bookings</td></tr>'}
+        </tbody>
+      </table>
+    </div>
+    <div class="table-wrap">
+      <div class="table-head"><span class="table-head-title">Past Appointments</span></div>
+      <table>
+        <thead><tr><th>Date</th><th>Time</th><th>Customer</th><th>Service</th><th>Price</th></tr></thead>
+        <tbody>${past.slice(0,20).length ? past.slice(0,20).map(b => `<tr>
+          <td style="color:var(--text3)">${fmtDate(b.date)}</td>
+          <td style="color:var(--text3)">${fmt12(b.time)}</td>
+          <td style="font-weight:600">${b.customerName}</td>
+          <td style="color:var(--text2)">${b.serviceName}</td>
+          <td style="font-weight:700;color:var(--green)">$${b.servicePrice}</td>
+        </tr>`).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:40px">No past bookings</td></tr>'}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// ── Traffic ───────────────────────────────────────────────────
+function renderTraffic() {
+  const views = stats.viewsByDay;
+  const totalThisMonth = Object.entries(views).filter(([d]) => d.startsWith(new Date().toISOString().slice(0,7))).reduce((s,[,v]) => s+v, 0);
+
+  document.getElementById('main').innerHTML = `
+    <div class="page-hdr">
+      <h1>Website Traffic</h1>
+      <p>Visits tracked across all pages of your website</p>
+    </div>
+    <div class="traffic-grid">
+      <div class="traffic-card">
+        <div class="traffic-num" style="color:var(--primary)">${stats.totalViews.toLocaleString()}</div>
+        <div class="traffic-lbl">Total Views</div>
+      </div>
+      <div class="traffic-card">
+        <div class="traffic-num" style="color:var(--primary)">${totalThisMonth}</div>
+        <div class="traffic-lbl">This Month</div>
+      </div>
+      <div class="traffic-card">
+        <div class="traffic-num" style="color:var(--green)">${stats.convRate}%</div>
+        <div class="traffic-lbl">Conversion Rate</div>
+      </div>
+      <div class="traffic-card">
+        <div class="traffic-num" style="color:var(--yellow)">${stats.totalBookings}</div>
+        <div class="traffic-lbl">Bookings from Site</div>
+      </div>
+    </div>
+    <div class="chart-card" style="margin-bottom:20px">
+      <div class="card-title">Daily Website Visits — Last 30 Days</div>
+      <div class="card-sub">Unique page loads across all pages</div>
+      <canvas id="views-chart" height="100"></canvas>
+    </div>
+    <div class="chart-card">
+      <div class="card-title">How conversion works</div>
+      <div class="card-sub" style="margin-bottom:20px">Every visitor is a potential booking. Your site is always selling.</div>
+      <div style="display:grid;grid-template-columns:repeat(4,1fr);gap:12px">
+        ${[['↗','Visitor lands on site','Every Google search, referral, or social click'],
+           ['📄','Browses your services','Sees pricing, process, and reviews'],
+           ['📅','Clicks Book Now','Goes to your booking page'],
+           ['✓','Confirms appointment','You get an SMS instantly']].map(([icon,title,desc]) =>
+          `<div style="background:var(--bg3);border-radius:10px;padding:16px">
+            <div style="font-size:22px;margin-bottom:10px">${icon}</div>
+            <div style="font-size:13px;font-weight:700;margin-bottom:4px">${title}</div>
+            <div style="font-size:12px;color:var(--text3);line-height:1.5">${desc}</div>
+          </div>`).join('')}
+      </div>
+    </div>`;
+
+  const ctx = document.getElementById('views-chart').getContext('2d');
+  new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels: Object.keys(views).map(d => { const [,m,day] = d.split('-'); return `${parseInt(m)}/${parseInt(day)}`; }),
+      datasets: [{
+        data: Object.values(views),
+        backgroundColor: 'rgba(59,130,246,0.2)', borderColor: 'rgba(59,130,246,0.7)',
+        borderWidth: 1.5, borderRadius: 4,
+      }]
+    },
+    options: { responsive: true, plugins: { legend: { display: false } }, scales: {
+      x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 11 } } },
+      y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 11 }, stepSize: 1 } }
+    }}
+  });
+}
+
+// ── All Bookings ──────────────────────────────────────────────
+function renderBookings() {
+  document.getElementById('main').innerHTML = `
+    <div class="page-hdr"><h1>All Bookings</h1><p>${bookings.length} total</p></div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>ID</th><th>Customer</th><th>Service</th><th>Date</th><th>Time</th><th>Price</th><th>Status</th></tr></thead>
+        <tbody>${bookings.length ? bookings.map(b => `<tr>
+          <td style="font-family:monospace;font-size:11px;color:var(--text3)">${b.shortId||b.id.slice(-6)}</td>
+          <td><div style="font-weight:600">${b.customerName}</div><div style="font-size:11px;color:var(--text3)">${b.phone}</div></td>
+          <td style="color:var(--text2)">${b.serviceName}</td>
+          <td style="color:var(--text2)">${b.date}</td>
+          <td style="color:var(--text2)">${fmt12(b.time)}</td>
+          <td style="font-weight:700;color:var(--green)">$${b.servicePrice}</td>
+          <td><span class="badge badge-${b.status}">${b.status}</span></td>
+        </tr>`).join('') : '<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:40px">No bookings yet</td></tr>'}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// ── Walk-ins ──────────────────────────────────────────────────
+function renderWalkins() {
+  document.getElementById('main').innerHTML = `
+    <div class="page-hdr">
+      <h1>Add Walk-in</h1>
+      <p>Manually trigger the review SMS flow for customers who didn't book online</p>
+    </div>
+    <div class="form-card">
+      <h3>Add a customer</h3>
+      <p>They'll automatically receive a review SMS 24 hours after you add them. 4-5 stars goes to Google, 1-3 stars stays private.</p>
+      <div class="form-row">
+        <div class="field"><label>Customer Name</label><input type="text" id="wk-name" placeholder="Alex Johnson"/></div>
+        <div class="field"><label>Phone Number</label><input type="tel" id="wk-phone" placeholder="+1 (403) 555-0123"/></div>
+        <div class="field"><label>Service</label><input type="text" id="wk-service" placeholder="e.g. Haircut"/></div>
+        <button class="btn-sm" onclick="addWalkin()">Add + Schedule SMS</button>
+      </div>
+      <div class="form-msg" id="wk-msg"></div>
+    </div>
+    <div class="table-wrap">
+      <div class="table-head"><span class="table-head-title">Walk-in Customers</span></div>
+      <table>
+        <thead><tr><th>Customer</th><th>Service</th><th>Added</th><th>Review SMS</th></tr></thead>
+        <tbody id="wk-tbody">${renderWalkinRows()}</tbody>
+      </table>
+    </div>`;
+}
+
+function renderWalkinRows() {
+  if (!walkins.length) return '<tr><td colspan="4" style="text-align:center;color:var(--text3);padding:40px">No walk-ins yet</td></tr>';
+  return walkins.map(w => `<tr>
+    <td><div style="font-weight:600">${w.customerName}</div><div style="font-size:11px;color:var(--text3)">${w.phone}</div></td>
+    <td style="color:var(--text2)">${w.serviceName}</td>
+    <td style="color:var(--text3);font-size:12px">${new Date(w.createdAt).toLocaleDateString()}</td>
+    <td><span class="badge ${w.reviewSentAt ? 'badge-confirmed' : 'badge-pending'}">${w.reviewSentAt ? 'Sent' : 'Scheduled'}</span></td>
+  </tr>`).join('');
+}
+
+async function addWalkin() {
+  const name    = document.getElementById('wk-name').value.trim();
+  const phone   = document.getElementById('wk-phone').value.trim();
+  const service = document.getElementById('wk-service').value.trim();
+  const msg     = document.getElementById('wk-msg');
+  if (!name || !phone) { msg.className='form-msg fail'; msg.style.display='block'; msg.textContent='Name and phone are required.'; return; }
+  const btn = document.querySelector('.btn-sm');
+  btn.textContent = 'Adding...'; btn.disabled = true;
+  try {
+    const r = await fetch(API + '/api/walkins', { method:'POST', headers:{'Content-Type':'application/json'}, body: JSON.stringify({ customerName: name, phone, serviceName: service }) });
+    const d = await r.json();
+    if (d.success) {
+      msg.className='form-msg ok'; msg.style.display='block';
+      msg.textContent = '✓ Added! Review SMS scheduled for 24 hours from now.';
+      document.getElementById('wk-name').value='';
+      document.getElementById('wk-phone').value='';
+      document.getElementById('wk-service').value='';
+      // Refresh walkins
+      const wr = await fetch(API + '/api/walkins?password=' + encodeURIComponent(pwd));
+      walkins = await wr.json();
+      document.getElementById('wk-tbody').innerHTML = renderWalkinRows();
+    } else {
+      msg.className='form-msg fail'; msg.style.display='block'; msg.textContent = d.error || 'Error.';
+    }
+  } catch(e) {
+    msg.className='form-msg fail'; msg.style.display='block'; msg.textContent='Connection error.';
+  }
+  btn.textContent='Add + Schedule SMS'; btn.disabled=false;
+}
+
+// ── Reviews ───────────────────────────────────────────────────
+function renderReviews() {
+  document.getElementById('main').innerHTML = `
+    <div class="page-hdr"><h1>Reviews</h1><p>Automated follow-up performance</p></div>
+    <div class="stats-row" style="grid-template-columns:repeat(3,1fr)">
+      <div class="stat-card yellow">
+        <div class="stat-lbl">Avg Rating</div>
+        <div class="stat-num yellow">${stats.avgRating || '—'}</div>
+        <div class="stat-sub">From review system</div>
+      </div>
+      <div class="stat-card blue">
+        <div class="stat-lbl">Review Rate</div>
+        <div class="stat-num blue">${stats.reviewRate}%</div>
+        <div class="stat-sub">Industry average ~8%</div>
+      </div>
+      <div class="stat-card green">
+        <div class="stat-lbl">SMS Automation</div>
+        <div class="stat-num green" style="font-size:1.4rem;padding-top:8px">Active</div>
+        <div class="stat-sub">Fires 24h after every appointment</div>
+      </div>
+    </div>
+    <div class="form-card">
+      <h3>How the review funnel works</h3>
+      <p>Every booking and walk-in automatically triggers a review SMS 24 hours later. High ratings go to Google, low ratings stay private.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;align-items:center">
+        ${[['1','Appointment done'],['→',''],['2','SMS fires +24h'],['→',''],['4-5★','→ Google review'],['→',''],['1-3★','→ Private feedback']].map(([l,t]) =>
+          t ? `<div style="background:var(--bg3);border-radius:10px;padding:12px 16px"><div style="font-size:18px;font-weight:800;color:var(--text)">${l}</div><div style="font-size:11px;color:var(--text3);margin-top:3px">${t}</div></div>`
+            : `<div style="color:var(--text3);font-size:18px">${l}</div>`
+        ).join('')}
+      </div>
+    </div>`;
+}
+
+function logout() {
+  API=''; pwd=''; stats=null; bookings=[]; walkins=[];
+  document.getElementById('app').style.display='none';
+  document.getElementById('login').style.display='flex';
+  document.getElementById('pwd').value='';
+  document.getElementById('api-url').value='';
+  document.getElementById('url-preview').textContent='';
+  document.getElementById('err').style.display='none';
+  document.getElementById('login-btn').textContent='Access Dashboard';
+  document.getElementById('login-btn').disabled=false;
+}
+</script>
+</body>
+</html>
