@@ -3,6 +3,7 @@
 <head>
 <meta charset="UTF-8"/>
 <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<meta name="robots" content="noindex, nofollow"/>
 <title>Admin — Business Dashboard</title>
 <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap" rel="stylesheet"/>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
@@ -90,7 +91,7 @@ body{background:var(--bg);color:var(--text);font-family:'Outfit',sans-serif;min-
 .no-sched{font-size:13px;color:var(--text3);text-align:center;padding:32px 0}
 
 /* Table */
-.table-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow:hidden;margin-bottom:20px}
+.table-wrap{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:20px}
 .table-head{padding:18px 20px;border-bottom:1px solid var(--border);display:flex;align-items:center;justify-content:space-between}
 .table-head-title{font-size:14px;font-weight:700}
 table{width:100%;border-collapse:collapse}
@@ -139,6 +140,18 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   .charts-row{grid-template-columns:1fr}
   .form-row{grid-template-columns:1fr}
   .traffic-grid{grid-template-columns:1fr 1fr}
+}
+@media(max-width:640px){
+  .stats-row{grid-template-columns:1fr}
+  .traffic-grid{grid-template-columns:1fr 1fr}
+  .main{padding:16px}
+  .field input,.field select{font-size:16px}
+  .login-box{padding:36px 24px}
+}
+.table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
+table{min-width:560px}
+@media(prefers-reduced-motion:reduce){
+  *,*::before,*::after{animation-duration:0.01ms!important;transition-duration:0.01ms!important}
 }
 </style>
 </head>
@@ -212,7 +225,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 <script>
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const MONTHS_LONG = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-let API = '', pwd = '', stats = null, bookings = [], walkins = [];
+let API = '', pwd = '', stats = null, bookings = [], walkins = [], feedback = [];
 
 // Show URL preview as user types
 document.getElementById('api-url').addEventListener('input', function() {
@@ -228,15 +241,17 @@ async function login() {
   btn.textContent = 'Connecting...'; btn.disabled = true;
 
   try {
-    const [sr, br, wr] = await Promise.all([
-      fetch(API + '/api/stats?password=' + encodeURIComponent(pwd)),
+    const [sr, br, wr, fr] = await Promise.all([
+      fetch(API + '/api/stats?password='    + encodeURIComponent(pwd)),
       fetch(API + '/api/bookings?password=' + encodeURIComponent(pwd)),
-      fetch(API + '/api/walkins?password=' + encodeURIComponent(pwd)),
+      fetch(API + '/api/walkins?password='  + encodeURIComponent(pwd)),
+      fetch(API + '/api/feedback?password=' + encodeURIComponent(pwd)),
     ]);
     if (sr.status === 401) { showErr('Wrong password or couldn\'t connect.'); btn.textContent = 'Access Dashboard'; btn.disabled = false; return; }
     stats    = await sr.json();
     bookings = await br.json();
     walkins  = await wr.json();
+    feedback = fr.ok ? await fr.json() : [];
 
     // Get business name
     const ir = await fetch(API + '/api/info');
@@ -584,6 +599,37 @@ async function addWalkin() {
 
 // ── Reviews ───────────────────────────────────────────────────
 function renderReviews() {
+  const starBar = (r) => '★'.repeat(r) + '☆'.repeat(5 - r);
+  const starColor = (r) => r >= 4 ? 'var(--green)' : r === 3 ? 'var(--yellow)' : 'var(--red)';
+  const fmtTs = (iso) => {
+    const d = new Date(iso);
+    return `${MONTHS[d.getMonth()]} ${d.getDate()}, ${d.getFullYear()}`;
+  };
+
+  const cards = feedback.length
+    ? feedback.map(f => `
+      <div style="background:var(--bg3);border:1px solid var(--border);border-radius:var(--radius);padding:20px 24px;display:flex;flex-direction:column;gap:8px">
+        <div style="display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div style="display:flex;align-items:center;gap:10px">
+            <div style="width:36px;height:36px;border-radius:50%;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:14px;font-weight:700;color:var(--text)">${(f.customerName||'?')[0].toUpperCase()}</div>
+            <div>
+              <div style="font-weight:600;font-size:14px">${f.customerName || 'Customer'}</div>
+              <div style="font-size:11px;color:var(--text3)">${f.serviceName || ''}</div>
+            </div>
+          </div>
+          <div style="display:flex;align-items:center;gap:10px">
+            <span style="color:${starColor(f.rating)};font-size:15px;letter-spacing:1px">${starBar(f.rating)}</span>
+            <span style="font-size:11px;color:var(--text3)">${fmtTs(f.submittedAt)}</span>
+            ${f.rating >= 4
+              ? `<span style="background:var(--green-bg);color:var(--green);font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;letter-spacing:0.05em">→ GOOGLE</span>`
+              : `<span style="background:var(--red-bg);color:var(--red);font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px;letter-spacing:0.05em">PRIVATE</span>`}
+          </div>
+        </div>
+        ${f.comment ? `<p style="font-size:13px;color:var(--text2);line-height:1.6;margin-top:4px;padding-top:12px;border-top:1px solid var(--border)">"${f.comment}"</p>` : ''}
+      </div>`)
+    .join('')
+    : `<div style="text-align:center;color:var(--text3);padding:60px 20px;background:var(--bg3);border-radius:var(--radius)">No reviews yet — they'll appear here after customers submit feedback.</div>`;
+
   document.getElementById('main').innerHTML = `
     <div class="page-hdr"><h1>Reviews</h1><p>Automated follow-up performance</p></div>
     <div class="stats-row" style="grid-template-columns:repeat(3,1fr)">
@@ -598,21 +644,22 @@ function renderReviews() {
         <div class="stat-sub">Industry average ~8%</div>
       </div>
       <div class="stat-card green">
-        <div class="stat-lbl">SMS Automation</div>
-        <div class="stat-num green" style="font-size:1.4rem;padding-top:8px">Active</div>
-        <div class="stat-sub">Fires 24h after every appointment</div>
+        <div class="stat-lbl">Total Reviews</div>
+        <div class="stat-num green">${feedback.length}</div>
+        <div class="stat-sub">SMS fires 24h after appointment</div>
       </div>
     </div>
-    <div class="form-card">
+    <div class="form-card" style="margin-bottom:20px">
       <h3>How the review funnel works</h3>
-      <p>Every booking and walk-in automatically triggers a review SMS 24 hours later. High ratings go to Google, low ratings stay private.</p>
-      <div style="display:flex;flex-wrap:wrap;gap:10px;margin-top:8px;align-items:center">
+      <p style="margin-bottom:12px">Every booking and walk-in automatically triggers a review SMS 24 hours after the appointment. 4–5 stars redirects to Google, 1–3 stars stays private here.</p>
+      <div style="display:flex;flex-wrap:wrap;gap:10px;align-items:center">
         ${[['1','Appointment done'],['→',''],['2','SMS fires +24h'],['→',''],['4-5★','→ Google review'],['→',''],['1-3★','→ Private feedback']].map(([l,t]) =>
           t ? `<div style="background:var(--bg3);border-radius:10px;padding:12px 16px"><div style="font-size:18px;font-weight:800;color:var(--text)">${l}</div><div style="font-size:11px;color:var(--text3);margin-top:3px">${t}</div></div>`
             : `<div style="color:var(--text3);font-size:18px">${l}</div>`
         ).join('')}
       </div>
-    </div>`;
+    </div>
+    <div style="display:flex;flex-direction:column;gap:12px">${cards}</div>`;
 }
 
 function logout() {
