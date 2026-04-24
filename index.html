@@ -205,8 +205,8 @@ table{min-width:560px}
     <button class="nav-item" onclick="showPage('bookings',this)">
       <span class="nav-item-icon">☰</span> All Bookings
     </button>
-    <button class="nav-item" onclick="showPage('walkins',this)">
-      <span class="nav-item-icon">＋</span> Add Walk-in
+    <button class="nav-item" onclick="showPage('manual',this)">
+      <span class="nav-item-icon">＋</span> Manual Entry
     </button>
     <button class="nav-item" onclick="showPage('availability',this)">
       <span class="nav-item-icon">🚫</span> Block Times
@@ -284,6 +284,7 @@ function showPage(page, el) {
   else if (page === 'traffic')  renderTraffic();
   else if (page === 'bookings') renderBookings();
   else if (page === 'walkins')  renderWalkins();
+  else if (page === 'manual')   renderManualEntry();
   else if (page === 'availability') renderAvailability();
   else if (page === 'reviews')  renderReviews();
 }
@@ -534,6 +535,97 @@ function renderBookings() {
     </div>`;
 }
 
+// ── Manual Entry ─────────────────────────────────────────────
+function renderManualEntry() {
+  const manualBookings = bookings.filter(b => b.source === 'manual').slice(0, 30);
+  document.getElementById('main').innerHTML = `
+    <div class="page-hdr">
+      <h1>Manual Entry</h1>
+      <p>Log bookings that happened over the phone or in person. They count toward your revenue and monthly stats, and trigger the review SMS automatically.</p>
+    </div>
+    <div class="form-card" style="margin-bottom:20px">
+      <h3 style="margin-bottom:16px">Log a booking</h3>
+      <div class="form-row" style="grid-template-columns:1fr 1fr 1fr 1fr auto">
+        <div class="field" style="margin:0">
+          <label>Customer Name</label>
+          <input type="text" id="me-name" placeholder="Alex Johnson"/>
+        </div>
+        <div class="field" style="margin:0">
+          <label>Phone (optional)</label>
+          <input type="tel" id="me-phone" placeholder="+1 (403) 555-0123"/>
+        </div>
+        <div class="field" style="margin:0">
+          <label>Service</label>
+          <input type="text" id="me-service" placeholder="e.g. Full Detail"/>
+        </div>
+        <div class="field" style="margin:0">
+          <label>Price ($)</label>
+          <input type="number" id="me-price" placeholder="200" min="0"/>
+        </div>
+        <div class="field" style="margin:0;min-width:130px">
+          <label>Date</label>
+          <input type="date" id="me-date" value="${new Date().toISOString().split('T')[0]}"/>
+        </div>
+      </div>
+      <div style="margin-top:12px;display:flex;align-items:center;gap:12px;flex-wrap:wrap">
+        <div class="field" style="margin:0;flex:1;min-width:200px">
+          <label>Notes (optional)</label>
+          <input type="text" id="me-notes" placeholder="e.g. Paid cash, referral from Mike"/>
+        </div>
+        <button class="btn-sm" onclick="addManualEntry()" style="height:44px;margin-top:20px">Log Booking</button>
+      </div>
+      <div class="form-msg" id="me-msg"></div>
+      <p style="font-size:12px;color:var(--text3);margin-top:12px">If a phone number is entered, the review SMS fires immediately.</p>
+    </div>
+    <div class="table-wrap">
+      <div class="table-head"><span class="table-head-title">Manually Logged Bookings</span></div>
+      <table>
+        <thead><tr><th>Customer</th><th>Service</th><th>Price</th><th>Date</th><th>Review SMS</th></tr></thead>
+        <tbody>${manualBookings.length ? manualBookings.map(b => `<tr>
+          <td><div style="font-weight:600">${b.customerName}</div><div style="font-size:11px;color:var(--text3)">${b.phone||'—'}</div></td>
+          <td style="color:var(--text2)">${b.serviceName}</td>
+          <td style="font-weight:700;color:var(--green)">$${b.servicePrice}</td>
+          <td style="color:var(--text3);font-size:12px">${b.date}</td>
+          <td><span class="badge ${b.reviewSentAt?'badge-confirmed':'badge-pending'}">${b.reviewSentAt?'Sent':'—'}</span></td>
+        </tr>`).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:40px">No manual entries yet</td></tr>'}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+async function addManualEntry() {
+  const name    = document.getElementById('me-name').value.trim();
+  const phone   = document.getElementById('me-phone').value.trim();
+  const service = document.getElementById('me-service').value.trim();
+  const price   = document.getElementById('me-price').value.trim();
+  const date    = document.getElementById('me-date').value;
+  const notes   = document.getElementById('me-notes').value.trim();
+  const msg     = document.getElementById('me-msg');
+  if (!name || !service) { msg.className='form-msg fail'; msg.style.display='block'; msg.textContent='Name and service are required.'; return; }
+  const btn = document.querySelector('#me-msg').previousElementSibling.querySelector('.btn-sm') || document.querySelector('[onclick="addManualEntry()"]');
+  btn.textContent='Logging...'; btn.disabled=true;
+  try {
+    const r = await fetch(API + '/api/manual-entry?password=' + encodeURIComponent(pwd), {
+      method: 'POST', headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ customerName: name, phone, serviceName: service, servicePrice: price, date, notes })
+    });
+    const d = await r.json();
+    if (d.success) {
+      msg.className='form-msg ok'; msg.style.display='block';
+      msg.textContent = '✓ Logged! ' + (phone ? 'Review SMS sent.' : 'No phone — review SMS skipped.');
+      document.getElementById('me-name').value='';
+      document.getElementById('me-phone').value='';
+      document.getElementById('me-service').value='';
+      document.getElementById('me-price').value='';
+      document.getElementById('me-notes').value='';
+      const br = await fetch(API + '/api/bookings?password=' + encodeURIComponent(pwd));
+      bookings = await br.json();
+      renderManualEntry();
+    } else { msg.className='form-msg fail'; msg.style.display='block'; msg.textContent = d.error || 'Error.'; }
+  } catch(e) { msg.className='form-msg fail'; msg.style.display='block'; msg.textContent='Connection error.'; }
+  btn.textContent='Log Booking'; btn.disabled=false;
+}
+
 // ── Walk-ins ──────────────────────────────────────────────────
 function renderWalkins() {
   document.getElementById('main').innerHTML = `
@@ -605,8 +697,30 @@ async function addWalkin() {
 async function renderAvailability() {
   document.getElementById('main').innerHTML = `
     <div class="page-hdr"><h1>Block Times</h1><p>Mark dates or time slots as unavailable so customers can't book them.</p></div>
+
     <div class="form-card" style="margin-bottom:20px">
-      <h3 style="margin-bottom:16px">Select a date to manage</h3>
+      <h3 style="margin-bottom:4px">Block a time range</h3>
+      <p style="font-size:13px;color:var(--text2);margin-bottom:16px">Quickly block a chunk of time — e.g. 3:00 PM to 7:00 PM on a specific day.</p>
+      <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+        <div class="field" style="margin:0;flex:1;min-width:140px">
+          <label>Date</label>
+          <input type="date" id="range-date" min="${new Date().toISOString().split('T')[0]}"/>
+        </div>
+        <div class="field" style="margin:0;min-width:110px">
+          <label>From</label>
+          <input type="time" id="range-start" step="1800"/>
+        </div>
+        <div class="field" style="margin:0;min-width:110px">
+          <label>To</label>
+          <input type="time" id="range-end" step="1800"/>
+        </div>
+        <button class="btn-sm" onclick="blockRange()" style="height:44px">Block Range</button>
+      </div>
+      <div class="form-msg" id="range-msg"></div>
+    </div>
+
+    <div class="form-card" style="margin-bottom:20px">
+      <h3 style="margin-bottom:16px">Manage individual slots</h3>
       <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
         <div class="field" style="margin:0;flex:1;min-width:180px">
           <label>Date</label>
@@ -616,6 +730,27 @@ async function renderAvailability() {
       </div>
     </div>
     <div id="block-slots-area"></div>`;
+}
+
+async function blockRange() {
+  const date  = document.getElementById('range-date').value;
+  const start = document.getElementById('range-start').value;
+  const end   = document.getElementById('range-end').value;
+  const msg   = document.getElementById('range-msg');
+  if (!date || !start || !end) { msg.className='form-msg fail'; msg.style.display='block'; msg.textContent='Fill in all three fields.'; return; }
+  if (start >= end) { msg.className='form-msg fail'; msg.style.display='block'; msg.textContent='"From" must be before "To".'; return; }
+  const r = await fetch(API + '/api/blocked/range?password=' + encodeURIComponent(pwd), {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ date, startTime: start, endTime: end })
+  });
+  const d = await r.json();
+  if (d.success) {
+    msg.className='form-msg ok'; msg.style.display='block';
+    msg.textContent=`✓ Blocked all slots from ${formatTime12(start)} to ${formatTime12(end)} on ${new Date(date+'T12:00:00').toLocaleDateString('en-CA',{month:'short',day:'numeric'})}.`;
+    document.getElementById('range-date').value='';
+    document.getElementById('range-start').value='';
+    document.getElementById('range-end').value='';
+  } else { msg.className='form-msg fail'; msg.style.display='block'; msg.textContent='Error — try again.'; }
 }
 
 async function loadBlockDate() {
