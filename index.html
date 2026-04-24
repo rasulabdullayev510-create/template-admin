@@ -208,6 +208,9 @@ table{min-width:560px}
     <button class="nav-item" onclick="showPage('walkins',this)">
       <span class="nav-item-icon">＋</span> Add Walk-in
     </button>
+    <button class="nav-item" onclick="showPage('availability',this)">
+      <span class="nav-item-icon">🚫</span> Block Times
+    </button>
     <button class="nav-item" onclick="showPage('reviews',this)">
       <span class="nav-item-icon">★</span> Reviews
     </button>
@@ -281,6 +284,7 @@ function showPage(page, el) {
   else if (page === 'traffic')  renderTraffic();
   else if (page === 'bookings') renderBookings();
   else if (page === 'walkins')  renderWalkins();
+  else if (page === 'availability') renderAvailability();
   else if (page === 'reviews')  renderReviews();
 }
 
@@ -595,6 +599,92 @@ async function addWalkin() {
     msg.className='form-msg fail'; msg.style.display='block'; msg.textContent='Connection error.';
   }
   btn.textContent='Add + Schedule SMS'; btn.disabled=false;
+}
+
+// ── Block Times ───────────────────────────────────────────────
+async function renderAvailability() {
+  document.getElementById('main').innerHTML = `
+    <div class="page-hdr"><h1>Block Times</h1><p>Mark dates or time slots as unavailable so customers can't book them.</p></div>
+    <div class="form-card" style="margin-bottom:20px">
+      <h3 style="margin-bottom:16px">Select a date to manage</h3>
+      <div style="display:flex;gap:12px;align-items:flex-end;flex-wrap:wrap">
+        <div class="field" style="margin:0;flex:1;min-width:180px">
+          <label>Date</label>
+          <input type="date" id="block-date" min="${new Date().toISOString().split('T')[0]}"/>
+        </div>
+        <button class="btn-sm" onclick="loadBlockDate()" style="height:44px">Load Slots →</button>
+      </div>
+    </div>
+    <div id="block-slots-area"></div>`;
+}
+
+async function loadBlockDate() {
+  const date = document.getElementById('block-date').value;
+  if (!date) return;
+  const area = document.getElementById('block-slots-area');
+  area.innerHTML = `<div style="color:var(--text3);padding:20px">Loading...</div>`;
+
+  const [slotsRes, blockedRes] = await Promise.all([
+    fetch(API + '/api/availability?date=' + date),
+    fetch(API + '/api/blocked?password=' + encodeURIComponent(pwd))
+  ]);
+  const slotsData  = await slotsRes.json();
+  const blockedAll = await blockedRes.json();
+
+  const dayBlocked = blockedAll.some(b => b.date === date && !b.time);
+  const allSlots   = slotsData.slots || [];
+
+  area.innerHTML = `
+    <div class="form-card">
+      <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:12px;margin-bottom:20px">
+        <div>
+          <div style="font-weight:700;font-size:15px">${new Date(date + 'T12:00:00').toLocaleDateString('en-CA', { weekday:'long', month:'long', day:'numeric' })}</div>
+          <div style="font-size:12px;color:var(--text3);margin-top:3px">${dayBlocked ? 'Entire day is blocked' : allSlots.length + ' time slots'}</div>
+        </div>
+        <button onclick="toggleDay('${date}', ${dayBlocked})" style="padding:10px 18px;border-radius:10px;border:1.5px solid ${dayBlocked ? 'var(--green)' : 'var(--red)'};background:${dayBlocked ? 'var(--green-bg)' : 'var(--red-bg)'};color:${dayBlocked ? 'var(--green)' : 'var(--red)'};font-family:inherit;font-size:13px;font-weight:700;cursor:pointer">
+          ${dayBlocked ? '✓ Unblock Entire Day' : '✕ Block Entire Day'}
+        </button>
+      </div>
+      ${dayBlocked ? `<p style="color:var(--text3);font-size:13px">Unblock the day to manage individual slots.</p>` : allSlots.length === 0 ? `<p style="color:var(--text3);font-size:13px">No available slots for this day based on your configured hours.</p>` : `
+      <div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px">
+        ${allSlots.map(s => {
+          const isBlocked = s.status === 'blocked' || blockedAll.some(b => b.date === date && b.time === s.time);
+          const isBooked  = s.status === 'booked';
+          return `<button onclick="${isBooked ? '' : `toggleSlot('${date}','${s.time}',${isBlocked})`}"
+            style="padding:12px 8px;border-radius:10px;border:1.5px solid ${isBooked ? 'var(--border)' : isBlocked ? 'var(--red)' : 'var(--green)'};
+            background:${isBooked ? 'var(--bg3)' : isBlocked ? 'var(--red-bg)' : 'var(--green-bg)'};
+            color:${isBooked ? 'var(--text3)' : isBlocked ? 'var(--red)' : 'var(--green)'};
+            font-family:inherit;font-size:13px;font-weight:600;cursor:${isBooked ? 'default' : 'pointer'};text-align:center">
+            <div>${formatTime12(s.time)}</div>
+            <div style="font-size:10px;margin-top:3px;text-transform:uppercase;letter-spacing:0.05em">${isBooked ? 'Booked' : isBlocked ? 'Blocked' : 'Open'}</div>
+          </button>`;
+        }).join('')}
+      </div>`}
+    </div>`;
+}
+
+function formatTime12(t) {
+  const [h, m] = t.split(':');
+  const hr = parseInt(h);
+  return `${hr > 12 ? hr - 12 : hr || 12}:${m} ${hr >= 12 ? 'PM' : 'AM'}`;
+}
+
+async function toggleDay(date, isBlocked) {
+  await fetch(API + '/api/blocked?password=' + encodeURIComponent(pwd), {
+    method: isBlocked ? 'DELETE' : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ date })
+  });
+  loadBlockDate();
+}
+
+async function toggleSlot(date, time, isBlocked) {
+  await fetch(API + '/api/blocked?password=' + encodeURIComponent(pwd), {
+    method: isBlocked ? 'DELETE' : 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ date, time })
+  });
+  loadBlockDate();
 }
 
 // ── Reviews ───────────────────────────────────────────────────
