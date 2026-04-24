@@ -205,6 +205,9 @@ table{min-width:560px}
     <button class="nav-item" onclick="showPage('bookings',this)">
       <span class="nav-item-icon">☰</span> All Bookings
     </button>
+    <button class="nav-item" onclick="showPage('clients',this)">
+      <span class="nav-item-icon">👤</span> Clients
+    </button>
     <button class="nav-item" onclick="showPage('manual',this)">
       <span class="nav-item-icon">＋</span> Manual Entry
     </button>
@@ -283,6 +286,7 @@ function showPage(page, el) {
   else if (page === 'schedule') renderSchedule();
   else if (page === 'traffic')  renderTraffic();
   else if (page === 'bookings') renderBookings();
+  else if (page === 'clients')  renderClients();
   else if (page === 'walkins')  renderWalkins();
   else if (page === 'manual')   renderManualEntry();
   else if (page === 'availability') renderAvailability();
@@ -530,6 +534,76 @@ function renderBookings() {
           <td style="font-weight:700;color:var(--green)">$${b.servicePrice}</td>
           <td><span class="badge badge-${b.status}">${b.status}</span></td>
         </tr>`).join('') : '<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:40px">No bookings yet</td></tr>'}
+        </tbody>
+      </table>
+    </div>`;
+}
+
+// ── Clients ───────────────────────────────────────────────────
+function renderClients() {
+  // Group confirmed bookings by phone (fall back to name if no phone)
+  const clientMap = {};
+  bookings.filter(b => b.status === 'confirmed').forEach(b => {
+    const key = b.phone ? b.phone.replace(/\D/g,'') : '__' + b.customerName.toLowerCase().trim();
+    if (!clientMap[key]) {
+      clientMap[key] = {
+        name: b.customerName,
+        phone: b.phone || '—',
+        visits: 0,
+        totalSpent: 0,
+        services: {},
+        firstVisit: b.date,
+        lastVisit: b.date,
+      };
+    }
+    const c = clientMap[key];
+    c.visits++;
+    c.totalSpent += Number(b.servicePrice) || 0;
+    c.services[b.serviceName] = (c.services[b.serviceName] || 0) + 1;
+    if (b.date < c.firstVisit) c.firstVisit = b.date;
+    if (b.date > c.lastVisit)  c.lastVisit  = b.date;
+  });
+
+  const clients = Object.values(clientMap).sort((a, b) => b.totalSpent - a.totalSpent);
+
+  document.getElementById('main').innerHTML = `
+    <div class="page-hdr">
+      <h1>Clients</h1>
+      <p>${clients.length} unique customers · sorted by total spend</p>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>#</th><th>Customer</th><th>Visits</th><th>Total Spent</th><th>Top Service</th><th>First Visit</th><th>Last Visit</th></tr></thead>
+        <tbody>${clients.length ? clients.map((c, i) => {
+          const topService = Object.entries(c.services).sort((a,b) => b[1]-a[1])[0];
+          const allServices = Object.entries(c.services).map(([s,n]) => n > 1 ? `${s} ×${n}` : s).join(', ');
+          const isRepeat = c.visits > 1;
+          return `<tr>
+            <td style="color:var(--text3);font-size:12px">${i+1}</td>
+            <td>
+              <div style="display:flex;align-items:center;gap:10px">
+                <div style="width:34px;height:34px;border-radius:50%;background:var(--bg4);display:flex;align-items:center;justify-content:center;font-size:13px;font-weight:700;color:var(--text);flex-shrink:0">${c.name[0].toUpperCase()}</div>
+                <div>
+                  <div style="font-weight:600">${c.name}</div>
+                  <div style="font-size:11px;color:var(--text3)">${c.phone}</div>
+                </div>
+              </div>
+            </td>
+            <td>
+              <div style="display:flex;align-items:center;gap:6px">
+                <span style="font-weight:700;color:${isRepeat?'var(--primary)':'var(--text)'}">${c.visits}</span>
+                ${isRepeat ? `<span style="background:var(--primary-glow);color:var(--primary);font-size:10px;font-weight:700;padding:2px 7px;border-radius:5px;letter-spacing:0.05em">REPEAT</span>` : ''}
+              </div>
+            </td>
+            <td style="font-weight:700;color:var(--green);font-size:15px">$${c.totalSpent.toLocaleString()}</td>
+            <td>
+              <div style="font-size:13px;color:var(--text2)">${topService ? topService[0] : '—'}</div>
+              ${Object.keys(c.services).length > 1 ? `<div style="font-size:11px;color:var(--text3);margin-top:2px">${allServices}</div>` : ''}
+            </td>
+            <td style="color:var(--text3);font-size:12px">${fmtDate(c.firstVisit)}</td>
+            <td style="color:${c.lastVisit === new Date().toISOString().split('T')[0] ? 'var(--green)' : 'var(--text3)'};font-size:12px">${fmtDate(c.lastVisit)}</td>
+          </tr>`;
+        }).join('') : '<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:40px">No confirmed bookings yet</td></tr>'}
         </tbody>
       </table>
     </div>`;
