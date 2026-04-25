@@ -423,29 +423,41 @@ function renderSchedule() {
     <div class="table-wrap">
       <div class="table-head"><span class="table-head-title">Upcoming Appointments</span></div>
       <table>
-        <thead><tr><th>Date</th><th>Time</th><th>Customer</th><th>Service</th><th>Price</th><th>Status</th></tr></thead>
-        <tbody>${upcoming.length ? upcoming.map(b => `<tr>
+        <thead><tr><th>Date</th><th>Time</th><th>Customer</th><th>Service</th><th>Type</th><th>Price</th><th>Status</th></tr></thead>
+        <tbody>${upcoming.length ? upcoming.map(b => {
+          const isMobile = b.serviceType === 'mobile';
+          const typeCell = isMobile
+            ? `<div><span style="background:rgba(245,158,11,0.12);color:var(--yellow);font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px">🚗 Mobile</span>${b.address ? `<div style="font-size:11px;color:var(--text3);margin-top:3px">${b.address}</div>` : ''}</div>`
+            : `<span style="background:rgba(59,130,246,0.1);color:var(--primary);font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px">📍 In-Shop</span>`;
+          return `<tr>
           <td style="font-weight:600;color:var(--primary)">${fmtDate(b.date)}</td>
           <td style="color:var(--text2)">${fmt12(b.time)}</td>
           <td><div style="font-weight:600">${b.customerName}</div><div style="font-size:11px;color:var(--text3)">${b.phone}</div></td>
           <td style="color:var(--text2)">${b.serviceName}</td>
+          <td>${typeCell}</td>
           <td style="font-weight:700;color:var(--green)">$${b.servicePrice}</td>
           <td><span class="badge badge-confirmed">Confirmed</span></td>
-        </tr>`).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:40px">No upcoming bookings</td></tr>'}
+        </tr>`;}).join('') : '<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:40px">No upcoming bookings</td></tr>'}
         </tbody>
       </table>
     </div>
     <div class="table-wrap">
       <div class="table-head"><span class="table-head-title">Past Appointments</span></div>
       <table>
-        <thead><tr><th>Date</th><th>Time</th><th>Customer</th><th>Service</th><th>Price</th></tr></thead>
-        <tbody>${past.slice(0,20).length ? past.slice(0,20).map(b => `<tr>
+        <thead><tr><th>Date</th><th>Time</th><th>Customer</th><th>Service</th><th>Type</th><th>Price</th></tr></thead>
+        <tbody>${past.slice(0,20).length ? past.slice(0,20).map(b => {
+          const isMobile = b.serviceType === 'mobile';
+          const typeCell = isMobile
+            ? `<div><span style="background:rgba(245,158,11,0.12);color:var(--yellow);font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px">🚗 Mobile</span>${b.address ? `<div style="font-size:11px;color:var(--text3);margin-top:3px">${b.address}</div>` : ''}</div>`
+            : `<span style="background:rgba(59,130,246,0.1);color:var(--primary);font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px">📍 In-Shop</span>`;
+          return `<tr>
           <td style="color:var(--text3)">${fmtDate(b.date)}</td>
           <td style="color:var(--text3)">${fmt12(b.time)}</td>
           <td style="font-weight:600">${b.customerName}</td>
           <td style="color:var(--text2)">${b.serviceName}</td>
+          <td>${typeCell}</td>
           <td style="font-weight:700;color:var(--green)">$${b.servicePrice}</td>
-        </tr>`).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:40px">No past bookings</td></tr>'}
+        </tr>`;}).join('') : '<tr><td colspan="6" style="text-align:center;color:var(--text3);padding:40px">No past bookings</td></tr>'}
         </tbody>
       </table>
     </div>`;
@@ -535,17 +547,23 @@ function renderBookings(filter) {
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>ID</th><th>Customer</th><th>Service</th><th>Date</th><th>Time</th><th>Price</th><th>Source</th><th>Status</th></tr></thead>
-        <tbody>${list.length ? list.map(b => `<tr>
+        <thead><tr><th>ID</th><th>Customer</th><th>Service</th><th>Type</th><th>Date</th><th>Time</th><th>Price</th><th>Source</th><th>Status</th></tr></thead>
+        <tbody>${list.length ? list.map(b => {
+          const isMobile = b.serviceType === 'mobile';
+          const typeCell = isMobile
+            ? `<div style="display:flex;align-items:center;gap:5px"><span style="background:rgba(245,158,11,0.12);color:var(--yellow);font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px">🚗 Mobile</span></div>${b.address ? `<div style="font-size:11px;color:var(--text3);margin-top:3px">${b.address}</div>` : ''}`
+            : `<span style="background:rgba(59,130,246,0.1);color:var(--primary);font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px">📍 In-Shop</span>`;
+          return `<tr>
           <td style="font-family:monospace;font-size:11px;color:var(--text3)">${b.shortId||b.id.slice(-6)}</td>
           <td><div style="font-weight:600">${b.customerName}</div><div style="font-size:11px;color:var(--text3)">${b.phone||'—'}</div></td>
           <td style="color:var(--text2)">${b.serviceName}</td>
+          <td>${typeCell}</td>
           <td style="color:var(--text2)">${b.date}</td>
           <td style="color:var(--text2)">${b.time !== '00:00' ? fmt12(b.time) : '—'}</td>
           <td style="font-weight:700;color:var(--green)">$${b.servicePrice}</td>
           <td><span class="badge ${b.source==='manual'?'badge-pending':'badge-confirmed'}">${b.source==='manual'?'Phone / In-Person':'Online'}</span></td>
           <td><span class="badge badge-${b.status}">${b.status}</span></td>
-        </tr>`).join('') : `<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:40px">No bookings in this category</td></tr>`}
+        </tr>`;}).join('') : `<tr><td colspan="9" style="text-align:center;color:var(--text3);padding:40px">No bookings in this category</td></tr>`}
         </tbody>
       </table>
     </div>`;
