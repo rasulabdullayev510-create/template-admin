@@ -646,10 +646,17 @@ function renderManualEntry() {
           <label>Notes (optional)</label>
           <input type="text" id="me-notes" placeholder="e.g. Paid cash, referral from Mike"/>
         </div>
+        <div class="field" style="margin:0;min-width:160px">
+          <label>Review SMS Delay</label>
+          <select id="me-delay">
+            <option value="0">Send immediately</option>
+            ${Array.from({length:24},(_,i)=>`<option value="${(i+1)*60}"${i+1===12?' selected':''}>${i+1} hour${i+1>1?'s':''}</option>`).join('')}
+          </select>
+        </div>
         <button class="btn-sm" onclick="addManualEntry()" style="height:44px;margin-top:20px">Log Booking</button>
       </div>
       <div class="form-msg" id="me-msg"></div>
-      <p style="font-size:12px;color:var(--text3);margin-top:12px">If a phone number is entered, the review SMS fires immediately.</p>
+      <p style="font-size:12px;color:var(--text3);margin-top:12px">Review SMS fires after the chosen delay. Requires a phone number.</p>
     </div>
     <div class="table-wrap">
       <div class="table-head"><span class="table-head-title">Manually Logged Bookings</span></div>
@@ -674,19 +681,21 @@ async function addManualEntry() {
   const price   = document.getElementById('me-price').value.trim();
   const date    = document.getElementById('me-date').value;
   const notes   = document.getElementById('me-notes').value.trim();
+  const delay   = parseInt(document.getElementById('me-delay').value);
   const msg     = document.getElementById('me-msg');
   if (!name || !service) { msg.className='form-msg fail'; msg.style.display='block'; msg.textContent='Name and service are required.'; return; }
-  const btn = document.querySelector('#me-msg').previousElementSibling.querySelector('.btn-sm') || document.querySelector('[onclick="addManualEntry()"]');
+  const btn = document.querySelector('[onclick="addManualEntry()"]');
   btn.textContent='Logging...'; btn.disabled=true;
   try {
     const r = await fetch(API + '/api/manual-entry?password=' + encodeURIComponent(pwd), {
       method: 'POST', headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ customerName: name, phone, serviceName: service, servicePrice: price, date, notes })
+      body: JSON.stringify({ customerName: name, phone, serviceName: service, servicePrice: price, date, notes, reviewDelayMinutes: delay })
     });
     const d = await r.json();
     if (d.success) {
       msg.className='form-msg ok'; msg.style.display='block';
-      msg.textContent = '✓ Logged! ' + (phone ? 'Review SMS sent.' : 'No phone — review SMS skipped.');
+      const smsNote = !phone ? 'No phone — SMS skipped.' : delay === 0 ? 'Review SMS sent immediately.' : `Review SMS scheduled in ${delay/60} hour${delay/60>1?'s':''}.`;
+      msg.textContent = '✓ Logged! ' + smsNote;
       document.getElementById('me-name').value='';
       document.getElementById('me-phone').value='';
       document.getElementById('me-service').value='';
