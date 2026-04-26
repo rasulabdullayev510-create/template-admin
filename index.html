@@ -1408,17 +1408,18 @@ async function addExpense() {
   if (!desc || !amount) { msg.className='form-msg fail'; msg.style.display='block'; msg.textContent='Description and amount required.'; return; }
   const btn = document.querySelector('[onclick="addExpense()"]');
   btn.textContent='Adding…'; btn.disabled=true;
-  const r = await fetch(API + '/api/expenses?password=' + encodeURIComponent(pwd), {
-    method:'POST', headers:{'Content-Type':'application/json'},
-    body: JSON.stringify({ description:desc, category:cat, amount, date })
-  });
-  const d = await r.json();
-  if (d.success) {
-    expenses = await (await fetch(API + '/api/expenses?password=' + encodeURIComponent(pwd))).json();
-    // Also refresh stats for updated expenses
-    stats = await (await fetch(API + '/api/stats?password=' + encodeURIComponent(pwd))).json();
-    renderExpenses();
-  } else { msg.className='form-msg fail'; msg.style.display='block'; msg.textContent='Error.'; btn.textContent='Add'; btn.disabled=false; }
+  try {
+    const r = await fetch(API + '/api/expenses?password=' + encodeURIComponent(pwd), {
+      method:'POST', headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({ description:desc, category:cat, amount, date })
+    });
+    const d = await r.json();
+    if (d.success) {
+      expenses = await (await fetch(API + '/api/expenses?password=' + encodeURIComponent(pwd))).json();
+      stats    = await (await fetch(API + '/api/stats?password='    + encodeURIComponent(pwd))).json();
+      renderExpenses();
+    } else { msg.className='form-msg fail'; msg.style.display='block'; msg.textContent='Error saving expense.'; btn.textContent='Add'; btn.disabled=false; }
+  } catch(e) { msg.className='form-msg fail'; msg.style.display='block'; msg.textContent='Connection error. Try again.'; btn.textContent='Add'; btn.disabled=false; }
 }
 
 async function deleteExpense(id) {
