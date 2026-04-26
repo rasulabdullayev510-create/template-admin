@@ -133,9 +133,18 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 /* Scrollbar */
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--border2);border-radius:4px}
 
+/* Mobile nav */
+.mob-header{display:none;align-items:center;gap:12px;height:56px;padding:0 16px;background:var(--bg2);border-bottom:1px solid var(--border);position:sticky;top:0;z-index:20;flex-shrink:0;width:100%}
+.mob-btn{background:none;border:none;font-size:22px;color:var(--text);cursor:pointer;padding:8px;border-radius:8px;font-family:inherit;line-height:1}
+.mob-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:24;display:none}
+.mob-overlay.open{display:block}
+
 /* Mobile */
 @media(max-width:900px){
-  .sidebar{display:none}
+  .app{flex-direction:column}
+  .mob-header{display:flex}
+  .sidebar{left:-260px;transition:left 0.25s ease;z-index:25;display:flex!important;top:0}
+  .sidebar.open{left:0;box-shadow:8px 0 32px rgba(0,0,0,0.35)}
   .main{margin-left:0;padding:20px}
   .stats-row{grid-template-columns:1fr 1fr}
   .charts-row{grid-template-columns:1fr}
@@ -143,11 +152,12 @@ tr:hover td{background:rgba(255,255,255,0.02)}
   .traffic-grid{grid-template-columns:1fr 1fr}
 }
 @media(max-width:640px){
-  .stats-row{grid-template-columns:1fr}
+  .stats-row{grid-template-columns:1fr 1fr}
   .traffic-grid{grid-template-columns:1fr 1fr}
   .main{padding:16px}
   .field input,.field select{font-size:16px}
   .login-box{padding:36px 24px}
+  .stat-num{font-size:1.8rem}
 }
 .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
 table{min-width:560px}
@@ -180,7 +190,15 @@ table{min-width:560px}
 
 <!-- ── App ── -->
 <div class="app" id="app">
-  <div class="sidebar">
+  <!-- Mobile top bar -->
+  <div class="mob-header" id="mob-header">
+    <button class="mob-btn" onclick="toggleMobileMenu()">☰</button>
+    <span id="mob-page-title" style="font-size:14px;font-weight:700;flex:1">Overview</span>
+    <span id="sb-name-mob" style="font-size:12px;color:var(--text3)"></span>
+  </div>
+  <div class="mob-overlay" id="mob-overlay" onclick="toggleMobileMenu()"></div>
+
+  <div class="sidebar" id="sidebar">
     <div class="sb-brand">
       <div>
         <div class="sb-brand-name" id="sb-name">Dashboard</div>
@@ -218,6 +236,9 @@ table{min-width:560px}
     <button class="nav-item" onclick="showPage('reviews',this)">
       <span class="nav-item-icon">★</span> Reviews
     </button>
+    <button class="nav-item" onclick="showPage('expenses',this)">
+      <span class="nav-item-icon">💸</span> Expenses
+    </button>
 
     <div class="sb-bottom">
       <button class="nav-item" onclick="logout()">
@@ -232,7 +253,7 @@ table{min-width:560px}
 <script>
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const MONTHS_LONG = ['January','February','March','April','May','June','July','August','September','October','November','December'];
-let API = '', pwd = '', stats = null, bookings = [], walkins = [], feedback = [];
+let API = '', pwd = '', stats = null, bookings = [], walkins = [], feedback = [], expenses = [];
 let currentPage = 'overview', currentPeriod = 'today', currentBookingsFilter = 'all';
 
 // Show URL preview as user types
@@ -249,23 +270,26 @@ async function login() {
   btn.textContent = 'Connecting...'; btn.disabled = true;
 
   try {
-    const [sr, br, wr, fr] = await Promise.all([
+    const [sr, br, wr, fr, er] = await Promise.all([
       fetch(API + '/api/stats?password='    + encodeURIComponent(pwd)),
       fetch(API + '/api/bookings?password=' + encodeURIComponent(pwd)),
       fetch(API + '/api/walkins?password='  + encodeURIComponent(pwd)),
       fetch(API + '/api/feedback?password=' + encodeURIComponent(pwd)),
+      fetch(API + '/api/expenses?password=' + encodeURIComponent(pwd)),
     ]);
     if (sr.status === 401) { showErr('Wrong password or couldn\'t connect.'); btn.textContent = 'Access Dashboard'; btn.disabled = false; return; }
     stats    = await sr.json();
     bookings = await br.json();
     walkins  = await wr.json();
     feedback = fr.ok ? await fr.json() : [];
+    expenses = er.ok ? await er.json() : [];
 
     // Get business name
     const ir = await fetch(API + '/api/info');
     const info = await ir.json();
     document.getElementById('sb-name').textContent = info.businessName || 'Dashboard';
     document.title = (info.businessName || 'Business') + ' — Admin';
+    const mn = document.getElementById('sb-name-mob'); if (mn) mn.textContent = info.businessName || '';
 
     document.getElementById('login').style.display = 'none';
     document.getElementById('app').style.display = 'flex';
@@ -281,10 +305,17 @@ function showErr(msg) {
   e.textContent = msg; e.style.display = 'block';
 }
 
+const PAGE_TITLES = { overview:'Overview', schedule:'Schedule', traffic:'Website Traffic', bookings:'Bookings', clients:'Clients', manual:'Manual Entry', availability:'Block Times', reviews:'Reviews', expenses:'Expenses' };
+
 function showPage(page, el) {
   currentPage = page;
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   if (el) el.classList.add('active');
+  const t = document.getElementById('mob-page-title');
+  if (t) t.textContent = PAGE_TITLES[page] || page;
+  // Close mobile menu if open
+  document.getElementById('sidebar').classList.remove('open');
+  document.getElementById('mob-overlay').classList.remove('open');
   if (page === 'overview')  renderOverview();
   else if (page === 'schedule') renderSchedule();
   else if (page === 'traffic')  renderTraffic();
@@ -294,6 +325,12 @@ function showPage(page, el) {
   else if (page === 'manual')   renderManualEntry();
   else if (page === 'availability') renderAvailability();
   else if (page === 'reviews')  renderReviews();
+  else if (page === 'expenses') renderExpenses();
+}
+
+function toggleMobileMenu() {
+  document.getElementById('sidebar').classList.toggle('open');
+  document.getElementById('mob-overlay').classList.toggle('open');
 }
 
 function fmt12(t) {
@@ -503,20 +540,30 @@ function renderOverview(period) {
   }
 
   // ── ALL TIME ──
+  const earned   = stats.earnedRevenue   ?? stats.totalRevenue ?? 0;
+  const upcoming = stats.upcomingRevenue ?? 0;
+  const totalExp = stats.totalExpenses   ?? 0;
+  const profit   = stats.netProfit       ?? (earned - totalExp);
   document.getElementById('main').innerHTML = `
     <div class="page-hdr"><h1>Overview</h1><p>All-time performance</p></div>
     ${tabs}
     <div class="stats-row">
-      <div class="stat-card green"><div class="stat-lbl">Total Revenue</div><div class="stat-num green">$${stats.totalRevenue.toLocaleString()}</div><div class="stat-sub">From confirmed bookings</div></div>
-      <div class="stat-card blue"><div class="stat-lbl">Total Bookings</div><div class="stat-num blue">${stats.totalBookings}</div><div class="stat-sub">All time</div></div>
+      <div class="stat-card green"><div class="stat-lbl">Earned Revenue</div><div class="stat-num green">$${earned.toLocaleString()}</div><div class="stat-sub">Completed appointments</div></div>
+      <div class="stat-card blue"><div class="stat-lbl">Upcoming Revenue</div><div class="stat-num blue">$${upcoming.toLocaleString()}</div><div class="stat-sub">Confirmed future bookings</div></div>
+      <div class="stat-card red"><div class="stat-lbl">Total Expenses</div><div class="stat-num" style="color:var(--red)">$${totalExp.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</div><div class="stat-sub">All logged costs</div></div>
+      <div class="stat-card ${profit>=0?'green':'red'}"><div class="stat-lbl">Net Profit</div><div class="stat-num" style="color:${profit>=0?'var(--green)':'var(--red)'}">${profit<0?'-':''}$${Math.abs(profit).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</div><div class="stat-sub">Earned minus expenses</div></div>
+    </div>
+    <div class="stats-row">
+      <div class="stat-card blue"><div class="stat-lbl">Total Bookings</div><div class="stat-num blue">${stats.totalBookings}</div><div class="stat-sub">All time confirmed</div></div>
       <div class="stat-card yellow"><div class="stat-lbl">Avg Rating</div><div class="stat-num yellow">${stats.avgRating||'—'}</div><div class="stat-sub">From review flow</div></div>
       <div class="stat-card blue"><div class="stat-lbl">Review Rate</div><div class="stat-num">${stats.reviewRate}%</div><div class="stat-sub">Industry avg ~8%</div></div>
+      <div class="stat-card green"><div class="stat-lbl">Conversion Rate</div><div class="stat-num green">${stats.convRate}%</div><div class="stat-sub">Visits → bookings</div></div>
     </div>
     <div class="stats-row">
       <div class="stat-card blue"><div class="stat-lbl">Site Views</div><div class="stat-num blue">${stats.totalViews.toLocaleString()}</div><div class="stat-sub">All pages</div></div>
-      <div class="stat-card green"><div class="stat-lbl">Conversion Rate</div><div class="stat-num green">${stats.convRate}%</div><div class="stat-sub">Visits → bookings</div></div>
       <div class="stat-card blue"><div class="stat-lbl">Walk-ins</div><div class="stat-num">${stats.totalWalkins}</div><div class="stat-sub">Manually added</div></div>
       <div class="stat-card green"><div class="stat-lbl">Total Reviews</div><div class="stat-num green">${feedback.length}</div><div class="stat-sub">Collected via SMS</div></div>
+      <div class="stat-card blue"><div class="stat-lbl">Expenses Logged</div><div class="stat-num">${expenses.length}</div><div class="stat-sub">Across all categories</div></div>
     </div>`;
 }
 
@@ -729,7 +776,7 @@ function renderClients() {
     if (b.date > c.lastVisit)  c.lastVisit  = b.date;
   });
 
-  const clients = Object.values(clientMap).sort((a, b) => b.totalSpent - a.totalSpent);
+  const clients = Object.values(clientMap).filter(c => c.visits > 0).sort((a, b) => b.totalSpent - a.totalSpent);
 
   document.getElementById('main').innerHTML = `
     <div class="page-hdr">
@@ -1279,6 +1326,104 @@ function renderReviews() {
       </div>
     </div>
     <div style="display:flex;flex-direction:column;gap:12px">${cards}</div>`;
+}
+
+// ── Expenses ─────────────────────────────────────────────────
+function renderExpenses() {
+  const totalExp = expenses.reduce((s,e) => s+(Number(e.amount)||0), 0);
+  const byCategory = {};
+  expenses.forEach(e => { byCategory[e.category] = (byCategory[e.category]||0) + (Number(e.amount)||0); });
+  const catBadgeColor = (c) => ({
+    'Supplies':'var(--primary)','Equipment':'var(--green)','Vehicle / Fuel':'var(--yellow)',
+    'Marketing':'rgba(168,85,247,1)','Software':'var(--primary)','Labor':'var(--green)'
+  }[c] || 'var(--text2)');
+  const catBadgeBg = (c) => ({
+    'Supplies':'var(--primary-glow)','Equipment':'var(--green-bg)','Vehicle / Fuel':'var(--yellow-bg)',
+    'Marketing':'rgba(168,85,247,0.12)','Software':'var(--primary-glow)','Labor':'var(--green-bg)'
+  }[c] || 'var(--bg3)');
+
+  document.getElementById('main').innerHTML = `
+    <div class="page-hdr"><h1>Expenses</h1><p>Log business costs to calculate true profit</p></div>
+
+    <div class="form-card" style="margin-bottom:20px">
+      <h3 style="margin-bottom:16px">Log an expense</h3>
+      <div style="display:grid;grid-template-columns:2fr 1fr 1fr 1fr auto;gap:12px;align-items:end;flex-wrap:wrap" id="ex-form-row">
+        <div class="field" style="margin:0"><label>Description</label><input type="text" id="ex-desc" placeholder="e.g. Polishing compound"/></div>
+        <div class="field" style="margin:0"><label>Category</label>
+          <select id="ex-cat">
+            <option>Supplies</option><option>Equipment</option><option>Vehicle / Fuel</option>
+            <option>Marketing</option><option>Software</option><option>Labor</option><option>Other</option>
+          </select>
+        </div>
+        <div class="field" style="margin:0"><label>Amount ($)</label><input type="number" id="ex-amount" placeholder="49.99" min="0" step="0.01"/></div>
+        <div class="field" style="margin:0"><label>Date</label><input type="date" id="ex-date" value="${new Date().toISOString().split('T')[0]}"/></div>
+        <button class="btn-sm" onclick="addExpense()" style="height:44px;margin-top:20px">Add</button>
+      </div>
+      <div class="form-msg" id="ex-msg"></div>
+    </div>
+
+    ${Object.keys(byCategory).length ? `
+    <div class="stats-row" style="margin-bottom:20px">
+      ${Object.entries(byCategory).sort((a,b)=>b[1]-a[1]).slice(0,4).map(([cat,amt]) => `
+        <div class="stat-card blue">
+          <div class="stat-lbl">${cat}</div>
+          <div class="stat-num" style="color:${catBadgeColor(cat)}">$${amt.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</div>
+          <div class="stat-sub">${expenses.filter(e=>e.category===cat).length} expense${expenses.filter(e=>e.category===cat).length!==1?'s':''}</div>
+        </div>`).join('')}
+    </div>` : ''}
+
+    <div class="table-wrap">
+      <div class="table-head">
+        <span class="table-head-title">All Expenses</span>
+        <span style="font-size:13px;color:var(--red);font-weight:700">Total: $${totalExp.toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2})}</span>
+      </div>
+      <table>
+        <thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Amount</th><th></th></tr></thead>
+        <tbody>${expenses.length ? expenses.map(e => `<tr>
+          <td style="color:var(--text3);font-size:12px">${e.date}</td>
+          <td style="font-weight:600">${e.description}</td>
+          <td><span style="background:${catBadgeBg(e.category)};color:${catBadgeColor(e.category)};font-size:10px;font-weight:700;padding:3px 9px;border-radius:6px;letter-spacing:0.04em">${e.category}</span></td>
+          <td style="font-weight:700;color:var(--red)">$${Number(e.amount).toFixed(2)}</td>
+          <td><button onclick="deleteExpense('${e.id}')" style="padding:4px 10px;border-radius:6px;border:1.5px solid var(--red);background:var(--red-bg);color:var(--red);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer">Delete</button></td>
+        </tr>`).join('') : '<tr><td colspan="5" style="text-align:center;color:var(--text3);padding:40px">No expenses logged yet</td></tr>'}
+        </tbody>
+      </table>
+    </div>`;
+
+  // Make form grid responsive on mobile
+  if (window.innerWidth < 700) {
+    document.getElementById('ex-form-row').style.gridTemplateColumns = '1fr 1fr';
+  }
+}
+
+async function addExpense() {
+  const desc   = document.getElementById('ex-desc').value.trim();
+  const cat    = document.getElementById('ex-cat').value;
+  const amount = document.getElementById('ex-amount').value;
+  const date   = document.getElementById('ex-date').value;
+  const msg    = document.getElementById('ex-msg');
+  if (!desc || !amount) { msg.className='form-msg fail'; msg.style.display='block'; msg.textContent='Description and amount required.'; return; }
+  const btn = document.querySelector('[onclick="addExpense()"]');
+  btn.textContent='Adding…'; btn.disabled=true;
+  const r = await fetch(API + '/api/expenses?password=' + encodeURIComponent(pwd), {
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body: JSON.stringify({ description:desc, category:cat, amount, date })
+  });
+  const d = await r.json();
+  if (d.success) {
+    expenses = await (await fetch(API + '/api/expenses?password=' + encodeURIComponent(pwd))).json();
+    // Also refresh stats for updated expenses
+    stats = await (await fetch(API + '/api/stats?password=' + encodeURIComponent(pwd))).json();
+    renderExpenses();
+  } else { msg.className='form-msg fail'; msg.style.display='block'; msg.textContent='Error.'; btn.textContent='Add'; btn.disabled=false; }
+}
+
+async function deleteExpense(id) {
+  if (!confirm('Delete this expense?')) return;
+  await fetch(API + '/api/expenses/' + id + '?password=' + encodeURIComponent(pwd), { method:'DELETE' });
+  expenses = await (await fetch(API + '/api/expenses?password=' + encodeURIComponent(pwd))).json();
+  stats    = await (await fetch(API + '/api/stats?password='    + encodeURIComponent(pwd))).json();
+  renderExpenses();
 }
 
 function logout() {
