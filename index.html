@@ -176,7 +176,7 @@ table{min-width:560px}
     <p class="login-sub">Enter your backend URL and password to access your dashboard.</p>
     <div class="field">
       <label>Backend URL</label>
-      <input type="url" id="api-url" placeholder="https://your-app.onrender.com"/>
+      <input type="text" id="api-url" placeholder="https://your-app.onrender.com" autocomplete="off" autocorrect="off" autocapitalize="none" spellcheck="false"/>
     </div>
     <p class="login-url" id="url-preview"></p>
     <div class="field">
@@ -262,7 +262,9 @@ document.getElementById('api-url').addEventListener('input', function() {
 });
 
 async function login() {
-  API  = (document.getElementById('api-url').value || '').replace(/\/$/, '');
+  let rawUrl = (document.getElementById('api-url').value || '').trim().replace(/\/$/, '');
+  if (rawUrl && !rawUrl.startsWith('http://') && !rawUrl.startsWith('https://')) rawUrl = 'https://' + rawUrl;
+  API = rawUrl;
   pwd  = document.getElementById('pwd').value;
   if (!API || !pwd) { showErr('Enter your backend URL and password.'); return; }
 
