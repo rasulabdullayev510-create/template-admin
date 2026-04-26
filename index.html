@@ -139,28 +139,56 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 .mob-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.55);z-index:24;display:none}
 .mob-overlay.open{display:block}
 
-/* Mobile */
+/* Tablet — sidebar slides in */
 @media(max-width:900px){
   .app{flex-direction:column}
   .mob-header{display:flex}
   .sidebar{left:-260px;transition:left 0.25s ease;z-index:25;display:flex!important;top:0}
   .sidebar.open{left:0;box-shadow:8px 0 32px rgba(0,0,0,0.35)}
-  .main{margin-left:0;padding:20px}
+  .main{margin-left:0;padding:24px}
   .stats-row{grid-template-columns:1fr 1fr}
   .charts-row{grid-template-columns:1fr}
-  .form-row{grid-template-columns:1fr}
+  .form-row{grid-template-columns:1fr!important}
   .traffic-grid{grid-template-columns:1fr 1fr}
 }
+
+/* Phone — compact everything */
 @media(max-width:640px){
-  .stats-row{grid-template-columns:1fr 1fr}
+  .main{padding:14px}
+  .page-hdr{margin-bottom:18px}
+  .page-hdr h1{font-size:1.35rem}
+  .page-hdr p{font-size:13px}
+  .stats-row{grid-template-columns:1fr 1fr!important;gap:10px;margin-bottom:16px}
+  .stat-card{padding:16px 14px}
+  .stat-num{font-size:1.5rem}
+  .stat-lbl{font-size:10px;margin-bottom:8px}
+  .stat-sub{font-size:11px}
+  .charts-row{gap:12px}
+  .chart-card,.form-card{padding:16px}
+  .card-title{font-size:13px}
   .traffic-grid{grid-template-columns:1fr 1fr}
-  .main{padding:16px}
-  .field input,.field select{font-size:16px}
-  .login-box{padding:36px 24px}
-  .stat-num{font-size:1.8rem}
+  .field input,.field select,.field textarea{font-size:16px}
+  .login-box{padding:24px 18px}
+  .login-title{font-size:1.5rem}
+  .login-sub{font-size:13px}
+  .btn-sm{font-size:12px;padding:10px 14px}
+  td,th{padding:10px;font-size:12px}
+  .table-head{padding:14px 16px}
+  .schedule-list{max-height:none}
+  #ex-form-row{grid-template-columns:1fr!important}
+  .form-card h3{font-size:14px}
+  .sched-item{gap:8px;padding:10px 12px}
+  .btn{padding:13px;font-size:14px}
 }
+
+/* Very small — single column stats */
+@media(max-width:380px){
+  .stats-row{grid-template-columns:1fr!important}
+  .main{padding:10px}
+}
+
 .table-scroll{overflow-x:auto;-webkit-overflow-scrolling:touch}
-table{min-width:560px}
+table{min-width:480px}
 @media(prefers-reduced-motion:reduce){
   *,*::before,*::after{animation-duration:0.01ms!important;transition-duration:0.01ms!important}
 }
@@ -380,22 +408,24 @@ function renderOverview(period) {
         <div style="margin-top:16px">
           ${todayBks.length ? todayBks.map(b => {
             const isMob = b.serviceType === 'mobile';
-            return `<div style="display:flex;align-items:flex-start;gap:16px;padding:16px 18px;background:var(--bg3);border-radius:12px;border:1px solid var(--border);margin-bottom:10px">
-              <div style="text-align:center;min-width:62px;padding-top:2px">
+            return `<div style="display:flex;align-items:flex-start;gap:14px;padding:16px;background:var(--bg3);border-radius:12px;border:1px solid var(--border);margin-bottom:10px;flex-wrap:wrap">
+              <div style="text-align:center;min-width:52px;padding-top:2px">
                 <div style="font-size:16px;font-weight:800;color:var(--primary)">${fmt12(b.time).replace(' AM','').replace(' PM','')}</div>
                 <div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:0.06em">${fmt12(b.time).includes('AM')?'AM':'PM'}</div>
               </div>
-              <div style="flex:1;min-width:0">
-                <div style="font-size:15px;font-weight:700;margin-bottom:2px">${b.customerName}</div>
+              <div style="flex:1;min-width:160px">
+                <div style="display:flex;justify-content:space-between;align-items:flex-start;gap:8px;margin-bottom:2px">
+                  <div style="font-size:15px;font-weight:700">${b.customerName}</div>
+                  <div style="font-size:16px;font-weight:800;color:var(--green);white-space:nowrap">$${b.servicePrice}</div>
+                </div>
                 <div style="font-size:13px;color:var(--text2);margin-bottom:8px">${b.serviceName}</div>
                 <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
                   ${isMob
                     ? `<span style="background:rgba(245,158,11,0.12);color:var(--yellow);font-size:11px;font-weight:700;padding:3px 9px;border-radius:6px">🚗 Mobile</span>${b.address?`<span style="font-size:12px;color:var(--text3)">${b.address}</span>`:''}`
                     : `<span style="background:rgba(59,130,246,0.1);color:var(--primary);font-size:11px;font-weight:700;padding:3px 9px;border-radius:6px">📍 In-Shop</span>`}
+                  ${b.phone?`<span style="font-size:11px;color:var(--text3)">${b.phone}</span>`:''}
                 </div>
-                ${b.phone?`<div style="font-size:11px;color:var(--text3);margin-top:5px">${b.phone}</div>`:''}
               </div>
-              <div style="font-size:17px;font-weight:800;color:var(--green)">$${b.servicePrice}</div>
             </div>`;
           }).join('') : `<div style="text-align:center;padding:52px 20px;color:var(--text3)">
             <div style="font-size:36px;margin-bottom:12px">📅</div>
@@ -1400,10 +1430,6 @@ function renderExpenses() {
       </table>
     </div>`;
 
-  // Make form grid responsive on mobile
-  if (window.innerWidth < 700) {
-    document.getElementById('ex-form-row').style.gridTemplateColumns = '1fr 1fr';
-  }
 }
 
 async function addExpense() {
