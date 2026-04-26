@@ -104,6 +104,7 @@ tr:hover td{background:rgba(255,255,255,0.02)}
 .badge-pending{background:var(--yellow-bg);color:var(--yellow)}
 .badge-denied,.badge-cancelled{background:var(--red-bg);color:var(--red)}
 .badge-sent{background:var(--green-bg);color:var(--green)}
+.badge-noshow{background:rgba(239,68,68,0.12);color:var(--red)}
 
 /* Walkins form */
 .form-card{background:var(--bg2);border:1px solid var(--border);border-radius:var(--radius);padding:28px;margin-bottom:20px}
@@ -232,6 +233,7 @@ table{min-width:560px}
 const MONTHS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
 const MONTHS_LONG = ['January','February','March','April','May','June','July','August','September','October','November','December'];
 let API = '', pwd = '', stats = null, bookings = [], walkins = [], feedback = [];
+let currentPage = 'overview', currentPeriod = 'today', currentBookingsFilter = 'all';
 
 // Show URL preview as user types
 document.getElementById('api-url').addEventListener('input', function() {
@@ -280,6 +282,7 @@ function showErr(msg) {
 }
 
 function showPage(page, el) {
+  currentPage = page;
   document.querySelectorAll('.nav-item').forEach(n => n.classList.remove('active'));
   if (el) el.classList.add('active');
   if (page === 'overview')  renderOverview();
@@ -303,109 +306,218 @@ function fmtDate(d) {
 }
 
 // ── Overview ─────────────────────────────────────────────────
-function renderOverview() {
+function renderOverview(period) {
+  period = period || currentPeriod;
+  currentPeriod = period;
+
+  const today = new Date().toISOString().split('T')[0];
+  const allConfirmed = bookings.filter(b => b.status === 'confirmed');
+  const tabStyle = p => `padding:8px 18px;border-radius:8px;border:1.5px solid ${period===p?'var(--primary)':'var(--border2)'};background:${period===p?'var(--primary-glow)':'transparent'};color:${period===p?'var(--primary)':'var(--text2)'};font-family:inherit;font-size:13px;font-weight:600;cursor:pointer;transition:all 0.15s`;
+  const tabs = `<div style="display:flex;gap:8px;margin-bottom:28px;flex-wrap:wrap">
+    <button style="${tabStyle('today')}"   onclick="renderOverview('today')">Today</button>
+    <button style="${tabStyle('week')}"    onclick="renderOverview('week')">This Week</button>
+    <button style="${tabStyle('30days')}"  onclick="renderOverview('30days')">Past 30 Days</button>
+    <button style="${tabStyle('alltime')}" onclick="renderOverview('alltime')">All Time</button>
+  </div>`;
+
+  // ── TODAY ──
+  if (period === 'today') {
+    const todayBks = allConfirmed.filter(b => b.date === today).sort((a,b) => a.time.localeCompare(b.time));
+    const revenue   = todayBks.reduce((s,b) => s+b.servicePrice, 0);
+    const mobileC   = todayBks.filter(b => b.serviceType === 'mobile').length;
+    const dateStr   = new Date().toLocaleDateString('en-US', { weekday:'long', month:'long', day:'numeric' });
+    document.getElementById('main').innerHTML = `
+      <div class="page-hdr"><h1>Overview</h1><p>${dateStr}</p></div>
+      ${tabs}
+      <div class="stats-row" style="grid-template-columns:repeat(3,1fr)">
+        <div class="stat-card green"><div class="stat-lbl">Revenue Today</div><div class="stat-num green">$${revenue.toLocaleString()}</div><div class="stat-sub">${todayBks.length} booking${todayBks.length!==1?'s':''}</div></div>
+        <div class="stat-card blue"><div class="stat-lbl">Appointments</div><div class="stat-num blue">${todayBks.length}</div><div class="stat-sub">Scheduled today</div></div>
+        <div class="stat-card yellow"><div class="stat-lbl">Mobile Jobs</div><div class="stat-num yellow">${mobileC}</div><div class="stat-sub">${todayBks.length-mobileC} in-shop</div></div>
+      </div>
+      <div class="chart-card">
+        <div class="card-title">Today's Schedule</div>
+        <div class="card-sub">${dateStr}</div>
+        <div style="margin-top:16px">
+          ${todayBks.length ? todayBks.map(b => {
+            const isMob = b.serviceType === 'mobile';
+            return `<div style="display:flex;align-items:flex-start;gap:16px;padding:16px 18px;background:var(--bg3);border-radius:12px;border:1px solid var(--border);margin-bottom:10px">
+              <div style="text-align:center;min-width:62px;padding-top:2px">
+                <div style="font-size:16px;font-weight:800;color:var(--primary)">${fmt12(b.time).replace(' AM','').replace(' PM','')}</div>
+                <div style="font-size:10px;font-weight:700;color:var(--text3);letter-spacing:0.06em">${fmt12(b.time).includes('AM')?'AM':'PM'}</div>
+              </div>
+              <div style="flex:1;min-width:0">
+                <div style="font-size:15px;font-weight:700;margin-bottom:2px">${b.customerName}</div>
+                <div style="font-size:13px;color:var(--text2);margin-bottom:8px">${b.serviceName}</div>
+                <div style="display:flex;align-items:center;gap:8px;flex-wrap:wrap">
+                  ${isMob
+                    ? `<span style="background:rgba(245,158,11,0.12);color:var(--yellow);font-size:11px;font-weight:700;padding:3px 9px;border-radius:6px">🚗 Mobile</span>${b.address?`<span style="font-size:12px;color:var(--text3)">${b.address}</span>`:''}`
+                    : `<span style="background:rgba(59,130,246,0.1);color:var(--primary);font-size:11px;font-weight:700;padding:3px 9px;border-radius:6px">📍 In-Shop</span>`}
+                </div>
+                ${b.phone?`<div style="font-size:11px;color:var(--text3);margin-top:5px">${b.phone}</div>`:''}
+              </div>
+              <div style="font-size:17px;font-weight:800;color:var(--green)">$${b.servicePrice}</div>
+            </div>`;
+          }).join('') : `<div style="text-align:center;padding:52px 20px;color:var(--text3)">
+            <div style="font-size:36px;margin-bottom:12px">📅</div>
+            <div style="font-size:15px;font-weight:700;color:var(--text2);margin-bottom:6px">No appointments today</div>
+            <div style="font-size:13px;line-height:1.6">Keep sharing your booking link — your next customer is on their way.</div>
+          </div>`}
+        </div>
+      </div>`;
+    return;
+  }
+
+  // ── THIS WEEK ──
+  if (period === 'week') {
+    const day = new Date().getDay();
+    const mondayOffset = day === 0 ? -6 : 1 - day;
+    const weekDays = Array.from({length:7}, (_, i) => {
+      const dd = new Date(); dd.setDate(dd.getDate() + mondayOffset + i);
+      return dd.toISOString().split('T')[0];
+    });
+    const weekBks = allConfirmed.filter(b => b.date >= weekDays[0] && b.date <= weekDays[6]);
+    const revenue  = weekBks.reduce((s,b) => s+b.servicePrice, 0);
+    const upcoming = weekBks.filter(b => b.date >= today).sort((a,b) => a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
+    document.getElementById('main').innerHTML = `
+      <div class="page-hdr"><h1>Overview</h1><p>This week at a glance</p></div>
+      ${tabs}
+      <div class="stats-row">
+        <div class="stat-card green"><div class="stat-lbl">Revenue This Week</div><div class="stat-num green">$${revenue.toLocaleString()}</div><div class="stat-sub">Confirmed bookings</div></div>
+        <div class="stat-card blue"><div class="stat-lbl">Bookings</div><div class="stat-num blue">${weekBks.length}</div><div class="stat-sub">This week total</div></div>
+        <div class="stat-card yellow"><div class="stat-lbl">Avg Rating</div><div class="stat-num yellow">${stats.avgRating||'—'}</div><div class="stat-sub">All-time average</div></div>
+        <div class="stat-card blue"><div class="stat-lbl">Remaining</div><div class="stat-num">${upcoming.length}</div><div class="stat-sub">Upcoming this week</div></div>
+      </div>
+      <div class="charts-row">
+        <div class="chart-card">
+          <div class="card-title">Revenue — This Week</div>
+          <div class="card-sub">Daily revenue Mon–Sun</div>
+          <canvas id="rev-chart" height="100"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="card-title">Upcoming This Week</div>
+          <div class="card-sub">${upcoming.length} appointment${upcoming.length!==1?'s':''} remaining</div>
+          <div class="schedule-list">
+            ${upcoming.length ? upcoming.slice(0,8).map(b => `
+              <div class="sched-item">
+                <span class="sched-date">${fmtDate(b.date)}</span>
+                <span class="sched-time">${fmt12(b.time)}</span>
+                <div style="flex:1"><div class="sched-name">${b.customerName}</div><div class="sched-svc">${b.serviceType==='mobile'?'🚗 '+(b.address||'Mobile'):b.serviceName}</div></div>
+                <span class="sched-price">$${b.servicePrice}</span>
+              </div>`).join('') : '<div class="no-sched">No more appointments this week</div>'}
+          </div>
+        </div>
+      </div>`;
+    setTimeout(() => {
+      const ctx = document.getElementById('rev-chart');
+      if (!ctx) return;
+      new Chart(ctx.getContext('2d'), {
+        type: 'bar',
+        data: {
+          labels: ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'],
+          datasets: [{ data: weekDays.map(d => weekBks.filter(b=>b.date===d).reduce((s,b)=>s+b.servicePrice,0)),
+            backgroundColor: weekDays.map(d => d===today?'rgba(59,130,246,0.55)':'rgba(59,130,246,0.2)'),
+            borderColor: weekDays.map(d => d===today?'rgba(59,130,246,1)':'rgba(59,130,246,0.6)'),
+            borderWidth:1.5, borderRadius:6 }]
+        },
+        options:{ responsive:true, plugins:{legend:{display:false}}, scales:{
+          x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'rgba(255,255,255,0.3)',font:{size:11}}},
+          y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'rgba(255,255,255,0.3)',font:{size:11},callback:v=>'$'+v}}
+        }}
+      });
+    }, 50);
+    return;
+  }
+
+  // ── PAST 30 DAYS ──
+  if (period === '30days') {
+    const d30 = new Date(); d30.setDate(d30.getDate()-29);
+    const start30 = d30.toISOString().split('T')[0];
+    const bks30  = allConfirmed.filter(b => b.date >= start30);
+    const revenue = bks30.reduce((s,b) => s+b.servicePrice, 0);
+    const upcoming = allConfirmed.filter(b => b.date >= today).sort((a,b) => a.date.localeCompare(b.date)||a.time.localeCompare(b.time));
+    document.getElementById('main').innerHTML = `
+      <div class="page-hdr"><h1>Overview</h1><p>Last 30 days performance</p></div>
+      ${tabs}
+      <div class="stats-row">
+        <div class="stat-card green"><div class="stat-lbl">Revenue (30d)</div><div class="stat-num green">$${revenue.toLocaleString()}</div><div class="stat-sub">Last 30 days</div></div>
+        <div class="stat-card blue"><div class="stat-lbl">Bookings (30d)</div><div class="stat-num blue">${bks30.length}</div><div class="stat-sub">Confirmed</div></div>
+        <div class="stat-card yellow"><div class="stat-lbl">Avg Rating</div><div class="stat-num yellow">${stats.avgRating||'—'}</div><div class="stat-sub">All-time average</div></div>
+        <div class="stat-card blue"><div class="stat-lbl">Review Rate</div><div class="stat-num">${stats.reviewRate}%</div><div class="stat-sub">Industry avg ~8%</div></div>
+      </div>
+      <div class="charts-row">
+        <div class="chart-card">
+          <div class="card-title">Revenue — Last 30 Days</div>
+          <div class="card-sub">Daily revenue from confirmed bookings</div>
+          <canvas id="rev-chart" height="100"></canvas>
+        </div>
+        <div class="chart-card">
+          <div class="card-title">Conversion Rate</div>
+          <div class="card-sub">Website visitors → booked appointments</div>
+          <div style="text-align:center;padding:20px 0">
+            <div style="font-size:3.5rem;font-weight:800;color:var(--primary);letter-spacing:-0.03em">${stats.convRate}%</div>
+            <div style="font-size:13px;color:var(--text3);margin-top:4px">${stats.homeViews} visits → ${stats.totalBookings} bookings</div>
+          </div>
+          <div class="conv-meter">
+            <div class="conv-bar-bg"><div class="conv-bar-fill" id="conv-fill" style="width:0%"></div></div>
+            <div class="conv-labels"><span>0%</span><span>Industry avg 3%</span><span>10%</span></div>
+          </div>
+          <div style="margin-top:20px;display:flex;flex-direction:column;gap:8px">
+            <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--text2)">Total site views</span><span style="font-weight:700">${stats.totalViews.toLocaleString()}</span></div>
+            <div style="display:flex;justify-content:space-between;font-size:13px"><span style="color:var(--text2)">Walk-in customers</span><span style="font-weight:700">${stats.totalWalkins}</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="chart-card">
+        <div class="card-title">Upcoming Appointments</div>
+        <div class="card-sub">Next confirmed bookings</div>
+        <div class="schedule-list" id="upcoming-list">
+          ${upcoming.length ? upcoming.slice(0,8).map(b => `
+            <div class="sched-item">
+              <span class="sched-date">${fmtDate(b.date)}</span>
+              <span class="sched-time">${fmt12(b.time)}</span>
+              <div style="flex:1"><div class="sched-name">${b.customerName}</div><div class="sched-svc">${b.serviceType==='mobile'?'🚗 '+(b.address||'Mobile'):b.serviceName}</div></div>
+              <span class="sched-price">$${b.servicePrice}</span>
+            </div>`).join('') : '<div class="no-sched">No upcoming bookings</div>'}
+        </div>
+      </div>`;
+    setTimeout(() => {
+      const ctx = document.getElementById('rev-chart');
+      if (!ctx) return;
+      new Chart(ctx.getContext('2d'), {
+        type:'line',
+        data:{
+          labels: Object.keys(stats.viewsByDay).map(d => { const [,m,day]=d.split('-'); return `${parseInt(m)}/${parseInt(day)}`; }),
+          datasets:[{ data: Object.keys(stats.viewsByDay).map(d => bookings.filter(b=>b.date===d&&b.status==='confirmed').reduce((s,b)=>s+b.servicePrice,0)),
+            borderColor:'#10b981', backgroundColor:'rgba(16,185,129,0.08)',
+            borderWidth:2, tension:0.4, fill:true, pointRadius:0, pointHoverRadius:4 }]
+        },
+        options:{ responsive:true, plugins:{legend:{display:false}}, scales:{
+          x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'rgba(255,255,255,0.3)',font:{size:11}}},
+          y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'rgba(255,255,255,0.3)',font:{size:11},callback:v=>'$'+v}}
+        }}
+      });
+      const cf = document.getElementById('conv-fill');
+      if (cf) cf.style.width = Math.min(parseFloat(stats.convRate)*10,100)+'%';
+    }, 50);
+    return;
+  }
+
+  // ── ALL TIME ──
   document.getElementById('main').innerHTML = `
-    <div class="page-hdr">
-      <h1>Overview</h1>
-      <p>All-time performance at a glance</p>
+    <div class="page-hdr"><h1>Overview</h1><p>All-time performance</p></div>
+    ${tabs}
+    <div class="stats-row">
+      <div class="stat-card green"><div class="stat-lbl">Total Revenue</div><div class="stat-num green">$${stats.totalRevenue.toLocaleString()}</div><div class="stat-sub">From confirmed bookings</div></div>
+      <div class="stat-card blue"><div class="stat-lbl">Total Bookings</div><div class="stat-num blue">${stats.totalBookings}</div><div class="stat-sub">All time</div></div>
+      <div class="stat-card yellow"><div class="stat-lbl">Avg Rating</div><div class="stat-num yellow">${stats.avgRating||'—'}</div><div class="stat-sub">From review flow</div></div>
+      <div class="stat-card blue"><div class="stat-lbl">Review Rate</div><div class="stat-num">${stats.reviewRate}%</div><div class="stat-sub">Industry avg ~8%</div></div>
     </div>
     <div class="stats-row">
-      <div class="stat-card green">
-        <div class="stat-lbl">Total Revenue</div>
-        <div class="stat-num green">$${stats.totalRevenue.toLocaleString()}</div>
-        <div class="stat-sub">From confirmed bookings</div>
-      </div>
-      <div class="stat-card blue">
-        <div class="stat-lbl">Total Bookings</div>
-        <div class="stat-num blue">${stats.totalBookings}</div>
-        <div class="stat-sub">Confirmed appointments</div>
-      </div>
-      <div class="stat-card yellow">
-        <div class="stat-lbl">Avg Rating</div>
-        <div class="stat-num yellow">${stats.avgRating || '—'}</div>
-        <div class="stat-sub">From automated review flow</div>
-      </div>
-      <div class="stat-card blue">
-        <div class="stat-lbl">Review Rate</div>
-        <div class="stat-num">${stats.reviewRate}%</div>
-        <div class="stat-sub">Industry avg ~8%</div>
-      </div>
-    </div>
-    <div class="charts-row">
-      <div class="chart-card">
-        <div class="card-title">Revenue — Last 30 Days</div>
-        <div class="card-sub">Daily revenue from confirmed bookings</div>
-        <canvas id="rev-chart" height="100"></canvas>
-      </div>
-      <div class="chart-card">
-        <div class="card-title">Conversion Rate</div>
-        <div class="card-sub">Website visitors → booked appointments</div>
-        <div style="text-align:center;padding:20px 0">
-          <div style="font-size:3.5rem;font-weight:800;color:var(--primary);letter-spacing:-0.03em">${stats.convRate}%</div>
-          <div style="font-size:13px;color:var(--text3);margin-top:4px">${stats.homeViews} website visits → ${stats.totalBookings} bookings</div>
-        </div>
-        <div class="conv-meter">
-          <div class="conv-bar-bg"><div class="conv-bar-fill" id="conv-fill" style="width:0%"></div></div>
-          <div class="conv-labels"><span>0%</span><span>Industry avg 3%</span><span>10%</span></div>
-        </div>
-        <div style="margin-top:20px;display:flex;flex-direction:column;gap:8px">
-          <div style="display:flex;justify-content:space-between;font-size:13px">
-            <span style="color:var(--text2)">Total site views</span>
-            <span style="font-weight:700">${stats.totalViews.toLocaleString()}</span>
-          </div>
-          <div style="display:flex;justify-content:space-between;font-size:13px">
-            <span style="color:var(--text2)">Walk-in customers</span>
-            <span style="font-weight:700">${stats.totalWalkins}</span>
-          </div>
-        </div>
-      </div>
-    </div>
-    <div class="chart-card">
-      <div class="card-title">Upcoming Appointments</div>
-      <div class="card-sub">Next confirmed bookings</div>
-      <div class="schedule-list" id="upcoming-list"></div>
+      <div class="stat-card blue"><div class="stat-lbl">Site Views</div><div class="stat-num blue">${stats.totalViews.toLocaleString()}</div><div class="stat-sub">All pages</div></div>
+      <div class="stat-card green"><div class="stat-lbl">Conversion Rate</div><div class="stat-num green">${stats.convRate}%</div><div class="stat-sub">Visits → bookings</div></div>
+      <div class="stat-card blue"><div class="stat-lbl">Walk-ins</div><div class="stat-num">${stats.totalWalkins}</div><div class="stat-sub">Manually added</div></div>
+      <div class="stat-card green"><div class="stat-lbl">Total Reviews</div><div class="stat-num green">${feedback.length}</div><div class="stat-sub">Collected via SMS</div></div>
     </div>`;
-
-  // Revenue chart
-  const revCtx = document.getElementById('rev-chart').getContext('2d');
-  new Chart(revCtx, {
-    type: 'line',
-    data: {
-      labels: Object.keys(stats.viewsByDay).map(d => { const [,m,day] = d.split('-'); return `${parseInt(m)}/${parseInt(day)}`; }),
-      datasets: [{
-        data: Object.keys(stats.viewsByDay).map(d => {
-          const bk = bookings.filter(b => b.date === d && b.status === 'confirmed');
-          return bk.reduce((s, b) => s + b.servicePrice, 0);
-        }),
-        borderColor: '#10b981', backgroundColor: 'rgba(16,185,129,0.08)',
-        borderWidth: 2, tension: 0.4, fill: true, pointRadius: 0, pointHoverRadius: 4,
-      }]
-    },
-    options: { responsive: true, plugins: { legend: { display: false } }, scales: {
-      x: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 11 } } },
-      y: { grid: { color: 'rgba(255,255,255,0.04)' }, ticks: { color: 'rgba(255,255,255,0.3)', font: { size: 11 }, callback: v => '$' + v } }
-    }}
-  });
-
-  // Conv fill
-  setTimeout(() => {
-    const pct = Math.min(parseFloat(stats.convRate) * 10, 100);
-    document.getElementById('conv-fill').style.width = pct + '%';
-  }, 100);
-
-  // Upcoming
-  const ul = document.getElementById('upcoming-list');
-  if (!stats.upcoming.length) {
-    ul.innerHTML = '<div class="no-sched">No upcoming bookings</div>';
-  } else {
-    ul.innerHTML = stats.upcoming.slice(0,8).map(b => `
-      <div class="sched-item">
-        <span class="sched-date">${fmtDate(b.date)}</span>
-        <span class="sched-time">${fmt12(b.time)}</span>
-        <div style="flex:1"><div class="sched-name">${b.customerName}</div><div class="sched-svc">${b.serviceName}</div></div>
-        <span class="sched-price">$${b.servicePrice}</span>
-      </div>`).join('');
-  }
 }
 
 // ── Schedule ─────────────────────────────────────────────────
@@ -423,7 +535,7 @@ function renderSchedule() {
     <div class="table-wrap">
       <div class="table-head"><span class="table-head-title">Upcoming Appointments</span></div>
       <table>
-        <thead><tr><th>Date</th><th>Time</th><th>Customer</th><th>Service</th><th>Type</th><th>Price</th><th>Status</th></tr></thead>
+        <thead><tr><th>Date</th><th>Time</th><th>Customer</th><th>Service</th><th>Type</th><th>Price</th><th>Status</th><th></th></tr></thead>
         <tbody>${upcoming.length ? upcoming.map(b => {
           const isMobile = b.serviceType === 'mobile';
           const typeCell = isMobile
@@ -437,7 +549,8 @@ function renderSchedule() {
           <td>${typeCell}</td>
           <td style="font-weight:700;color:var(--green)">$${b.servicePrice}</td>
           <td><span class="badge badge-confirmed">Confirmed</span></td>
-        </tr>`;}).join('') : '<tr><td colspan="7" style="text-align:center;color:var(--text3);padding:40px">No upcoming bookings</td></tr>'}
+          <td><button onclick="markNoShow('${b.id}')" style="padding:5px 11px;border-radius:7px;border:1.5px solid var(--red);background:var(--red-bg);color:var(--red);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">No-Show</button></td>
+        </tr>`;}).join('') : '<tr><td colspan="8" style="text-align:center;color:var(--text3);padding:40px">No upcoming bookings</td></tr>'}
         </tbody>
       </table>
     </div>
@@ -532,7 +645,8 @@ function renderTraffic() {
 
 // ── All Bookings ──────────────────────────────────────────────
 function renderBookings(filter) {
-  filter = filter || 'all';
+  filter = filter || currentBookingsFilter;
+  currentBookingsFilter = filter;
   const online   = bookings.filter(b => b.source !== 'manual');
   const manual   = bookings.filter(b => b.source === 'manual');
   const list     = filter === 'online' ? online : filter === 'manual' ? manual : bookings;
@@ -547,12 +661,18 @@ function renderBookings(filter) {
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>ID</th><th>Customer</th><th>Service</th><th>Type</th><th>Date</th><th>Time</th><th>Price</th><th>Source</th><th>Status</th></tr></thead>
+        <thead><tr><th>ID</th><th>Customer</th><th>Service</th><th>Type</th><th>Date</th><th>Time</th><th>Price</th><th>Source</th><th>Status</th><th></th></tr></thead>
         <tbody>${list.length ? list.map(b => {
           const isMobile = b.serviceType === 'mobile';
           const typeCell = isMobile
             ? `<div style="display:flex;align-items:center;gap:5px"><span style="background:rgba(245,158,11,0.12);color:var(--yellow);font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px">🚗 Mobile</span></div>${b.address ? `<div style="font-size:11px;color:var(--text3);margin-top:3px">${b.address}</div>` : ''}`
             : `<span style="background:rgba(59,130,246,0.1);color:var(--primary);font-size:10px;font-weight:700;padding:3px 8px;border-radius:6px">📍 In-Shop</span>`;
+          const statusBadge = b.status === 'noshow'
+            ? `<span class="badge badge-noshow">No-Show</span>`
+            : `<span class="badge badge-${b.status}">${b.status}</span>`;
+          const actionCell = b.status === 'confirmed'
+            ? `<button onclick="markNoShow('${b.id}')" style="padding:5px 11px;border-radius:7px;border:1.5px solid var(--red);background:var(--red-bg);color:var(--red);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">No-Show</button>`
+            : '';
           return `<tr>
           <td style="font-family:monospace;font-size:11px;color:var(--text3)">${b.shortId||b.id.slice(-6)}</td>
           <td><div style="font-weight:600">${b.customerName}</div><div style="font-size:11px;color:var(--text3)">${b.phone||'—'}</div></td>
@@ -562,8 +682,9 @@ function renderBookings(filter) {
           <td style="color:var(--text2)">${b.time !== '00:00' ? fmt12(b.time) : '—'}</td>
           <td style="font-weight:700;color:var(--green)">$${b.servicePrice}</td>
           <td><span class="badge ${b.source==='manual'?'badge-pending':'badge-confirmed'}">${b.source==='manual'?'Phone / In-Person':'Online'}</span></td>
-          <td><span class="badge badge-${b.status}">${b.status}</span></td>
-        </tr>`;}).join('') : `<tr><td colspan="9" style="text-align:center;color:var(--text3);padding:40px">No bookings in this category</td></tr>`}
+          <td>${statusBadge}</td>
+          <td>${actionCell}</td>
+        </tr>`;}).join('') : `<tr><td colspan="10" style="text-align:center;color:var(--text3);padding:40px">No bookings in this category</td></tr>`}
         </tbody>
       </table>
     </div>`;
@@ -573,7 +694,7 @@ function renderBookings(filter) {
 function renderClients() {
   // Group confirmed bookings by phone (fall back to name if no phone)
   const clientMap = {};
-  bookings.filter(b => b.status === 'confirmed').forEach(b => {
+  bookings.filter(b => b.status === 'confirmed' || b.status === 'noshow').forEach(b => {
     const key = b.phone ? b.phone.replace(/\D/g,'') : '__' + b.customerName.toLowerCase().trim();
     if (!clientMap[key]) {
       clientMap[key] = {
@@ -588,16 +709,24 @@ function renderClients() {
         manualCount: 0,
         mobileCount: 0,
         inShopCount: 0,
+        latestConfirmedId: null,
+        latestConfirmedDate: null,
       };
     }
     const c = clientMap[key];
-    c.visits++;
-    c.totalSpent += Number(b.servicePrice) || 0;
-    c.services[b.serviceName] = (c.services[b.serviceName] || 0) + 1;
+    if (b.status === 'confirmed') {
+      c.visits++;
+      c.totalSpent += Number(b.servicePrice) || 0;
+      c.services[b.serviceName] = (c.services[b.serviceName] || 0) + 1;
+      if (b.source === 'manual') c.manualCount++; else c.onlineCount++;
+      if (b.serviceType === 'mobile') c.mobileCount++; else c.inShopCount++;
+      if (!c.latestConfirmedDate || b.date > c.latestConfirmedDate) {
+        c.latestConfirmedDate = b.date;
+        c.latestConfirmedId   = b.id;
+      }
+    }
     if (b.date < c.firstVisit) c.firstVisit = b.date;
     if (b.date > c.lastVisit)  c.lastVisit  = b.date;
-    if (b.source === 'manual') c.manualCount++; else c.onlineCount++;
-    if (b.serviceType === 'mobile') c.mobileCount++; else c.inShopCount++;
   });
 
   const clients = Object.values(clientMap).sort((a, b) => b.totalSpent - a.totalSpent);
@@ -609,7 +738,7 @@ function renderClients() {
     </div>
     <div class="table-wrap">
       <table>
-        <thead><tr><th>#</th><th>Customer</th><th>Visits</th><th>Total Spent</th><th>Booked Via</th><th>Service Type</th><th>Top Service</th><th>First Visit</th><th>Last Visit</th></tr></thead>
+        <thead><tr><th>#</th><th>Customer</th><th>Visits</th><th>Total Spent</th><th>Booked Via</th><th>Service Type</th><th>Top Service</th><th>First Visit</th><th>Last Visit</th><th>Actions</th></tr></thead>
         <tbody>${clients.length ? clients.map((c, i) => {
           const topService = Object.entries(c.services).sort((a,b) => b[1]-a[1])[0];
           const allServices = Object.entries(c.services).map(([s,n]) => n > 1 ? `${s} ×${n}` : s).join(', ');
@@ -649,8 +778,14 @@ function renderClients() {
             </td>
             <td style="color:var(--text3);font-size:12px">${fmtDate(c.firstVisit)}</td>
             <td style="color:${c.lastVisit === new Date().toISOString().split('T')[0] ? 'var(--green)' : 'var(--text3)'};font-size:12px">${fmtDate(c.lastVisit)}</td>
+            <td>
+              <div style="display:flex;flex-direction:column;gap:6px">
+                ${c.phone !== '—' ? `<button onclick="sendWinback('${c.phone}','${c.name.replace(/'/g,"\\'")}',this)" style="padding:5px 11px;border-radius:7px;border:1.5px solid var(--primary);background:var(--primary-glow);color:var(--primary);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">📲 Win-Back</button>` : ''}
+                ${c.latestConfirmedId ? `<button onclick="markNoShow('${c.latestConfirmedId}')" style="padding:5px 11px;border-radius:7px;border:1.5px solid var(--red);background:var(--red-bg);color:var(--red);font-family:inherit;font-size:11px;font-weight:700;cursor:pointer;white-space:nowrap">No-Show</button>` : ''}
+              </div>
+            </td>
           </tr>`;
-        }).join('') : '<tr><td colspan="9" style="text-align:center;color:var(--text3);padding:40px">No confirmed bookings yet</td></tr>'}
+        }).join('') : '<tr><td colspan="10" style="text-align:center;color:var(--text3);padding:40px">No confirmed bookings yet</td></tr>'}
         </tbody>
       </table>
     </div>`;
@@ -771,6 +906,31 @@ async function addManualEntry() {
     } else { msg.className='form-msg fail'; msg.style.display='block'; msg.textContent = d.error || 'Error.'; }
   } catch(e) { msg.className='form-msg fail'; msg.style.display='block'; msg.textContent='Connection error.'; }
   btn.textContent='Log Booking'; btn.disabled=false;
+}
+
+async function markNoShow(id) {
+  if (!confirm('Mark this booking as a no-show? The review SMS will not be sent.')) return;
+  const r = await fetch(API + '/api/bookings/' + id + '/noshow?password=' + encodeURIComponent(pwd), { method: 'POST' });
+  const d = await r.json();
+  if (d.success) {
+    bookings = await (await fetch(API + '/api/bookings?password=' + encodeURIComponent(pwd))).json();
+    showPage(currentPage);
+  } else { alert('Failed to mark as no-show.'); }
+}
+
+async function sendWinback(phone, name, btn) {
+  btn.textContent = 'Sending…'; btn.disabled = true;
+  const r = await fetch(API + '/api/winback?password=' + encodeURIComponent(pwd), {
+    method: 'POST', headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ phone, customerName: name })
+  });
+  const d = await r.json();
+  if (d.success) {
+    btn.textContent = '✓ Sent!';
+    btn.style.borderColor = 'var(--green)'; btn.style.color = 'var(--green)'; btn.style.background = 'var(--green-bg)';
+  } else {
+    btn.textContent = 'Failed'; btn.disabled = false;
+  }
 }
 
 function toggleManualAddress() {
