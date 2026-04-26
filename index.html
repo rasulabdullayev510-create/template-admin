@@ -280,11 +280,12 @@ async function login() {
       fetch(API + '/api/expenses?password=' + encodeURIComponent(pwd)),
     ]);
     if (sr.status === 401) { showErr('Wrong password or couldn\'t connect.'); btn.textContent = 'Access Dashboard'; btn.disabled = false; return; }
+    const safeJson = async r => { try { return r.ok ? await r.json() : []; } catch(e) { return []; } };
     stats    = await sr.json();
     bookings = await br.json();
     walkins  = await wr.json();
-    feedback = fr.ok ? await fr.json() : [];
-    expenses = er.ok ? await er.json() : [];
+    feedback = await safeJson(fr);
+    expenses = await safeJson(er);
 
     // Get business name
     const ir = await fetch(API + '/api/info');
